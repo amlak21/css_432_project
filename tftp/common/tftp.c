@@ -106,7 +106,7 @@ char* create_ERR_packet(char* err_code, char* err_msg)
     return buffer;
 }
 
-//functions at reciever side
+// helper functions at reciever side
 // function to get opcode from recieved packet
 unsigned short get_opcode(char* packet)
 {
