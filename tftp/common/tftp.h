@@ -26,7 +26,7 @@ const static unsigned short OP_CODE_ACK = 4;
 // constants for Error packet
 const static unsigned short OP_CODE_ERR = 5;
 
-char* create_ACK_packet_sender(int block)
+char* create_ACK_packet(int block)
 {
     char *buffer = malloc(4);
     bzero(buffer, sizeof(buffer));
@@ -91,7 +91,7 @@ char* create_RRQ_packet(char* input_file)
 }
 
 
-char* create_data_packet_sender(int block, char* input_file)
+char* create_data_packet(int block, char* input_file)
 {
      char *buffer = malloc(MAX_BUFFER_SIZE_DP);
     bzero(buffer, sizeof(buffer));
