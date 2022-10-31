@@ -13,13 +13,14 @@ Program description:
 
 
 
-Files:
+Files
    1. tftpserver.c
    2. tftpclient.c
    3. tftp.h
    4. tftp.c
    5. test1.txt
    6. test2.txt
+
 
 
 Instruction to run:
@@ -31,9 +32,11 @@ Instruction to run:
                        : ./client WQR 127.0.0.1 test1.txt
 
 
+
 Implementation details:
   1. Read and write request: implemented
   2. Acknowledgement and data packet transferred between server and client: implemented
+
 
 
 
