@@ -7,9 +7,11 @@ Implementing and testing TFTP
 
 
 
+
 Program description:
       a client/server network application program in C/C++ on a UNIX platform
      is implemented and tested using the UDP/IP family of Internet protocols.
+
 
 
 
@@ -23,13 +25,15 @@ Files
 
 
 
+
 Instruction to run:
    1. Open two terminals one for server and the other for client 
    2. On the server terminal:   enter compiler
             For example: ./server 
    3. On the client terminal: enter compiler, the request, Ip address and the file name.
-            For example: ./client RRQ 127.0.0.1 test2.txt 
+            For example: ./client RRQ 127.0.0.1 test2.txt  OR
                        : ./client WQR 127.0.0.1 test1.txt
+
 
 
 
@@ -41,6 +45,9 @@ Implementation details:
 
 
 
-      =================//=======================
+
+
+
+      ============================//==================================
 
  
