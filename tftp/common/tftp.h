@@ -9,6 +9,9 @@
 #include <signal.h>         // for the signal handler registration.
 #include <unistd.h>
 
+#define SERV_UDP_PORT 51091 //PORT NUMBER 
+#define MAX_NUM_PACKETS 25  // maximum number of packets
+
 // constants for data packet
 const static int MAX_BUFFER_SIZE_DP = 516;
 const static unsigned short OP_CODE_DATA = 3;
@@ -45,7 +48,7 @@ char* create_WRQ_packet(char* input_file)
     bzero(buffer, sizeof(buffer));
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_WRQ); // add opcode data at empty buffer
-	
+ 
     char* file_string = buffer + OPCODE_OFFSET; // point at 3rd byte
 
     // concatinate input file, zero, and mode.
@@ -100,22 +103,22 @@ char* get_one_packet_data(char* input_file) // need to be tested
 {
     char* one_data_buffer = malloc(512);
 
-    bzero(one_data_buffer, sizeof(one_data_buffer));
+    
     if(sizeof(input_file) > 512)
     {
         // copy 512 bytes
-        strncpy (one_data_buffer, input_file, 512);
+        bzero(one_data_buffer, sizeof(one_data_buffer));
+        memcpy (one_data_buffer, input_file, 512);
     }
     else if(sizeof(input_file) < 512)
     {
         // copy size of large buffer
-        strncpy (one_data_buffer, input_file,strlen(input_file));
+        bzero(one_data_buffer, sizeof(one_data_buffer));
+        memcpy(one_data_buffer, input_file, sizeof(input_file));
     }
     // return 512 bytes
     return one_data_buffer;
 }
-
-
 char* create_ERR_packet(char* err_code, char* err_msg)
 {
     char *buffer = malloc (5 + strlen(err_msg));
@@ -125,7 +128,7 @@ char* create_ERR_packet(char* err_code, char* err_msg)
     
     char* file_string = buffer + OPCODE_OFFSET; // point at 3rd byte
     strcat(file_string, err_code);
-	strcat(file_string, err_msg);
+ strcat(file_string, err_msg);
     return buffer;
 }
 
@@ -142,8 +145,8 @@ char* get_file_data(char* data_packet)
 {
     char* buffer = data_packet;
     char* file_ptr = buffer + DATA_OFFSET; // point at 5th offset
-    char *file = malloc(strlen(file_ptr));
-    strncpy (file, file_ptr, strlen(file_ptr));
+    char *file = malloc(sizeof(file_ptr));
+    memcpy (file, file_ptr, sizeof(file_ptr));
     return file; // return the actual file data
 }
 
@@ -154,7 +157,6 @@ unsigned short get_block_number(char* packet)
     unsigned short block_num = ntohs(*block_num_ptr);
     return block_num; // return block number
 }
-
 // implement
 // get error code 
 // get error mesg
