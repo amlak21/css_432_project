@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
         int block_counter = 1; //block counter
 		char* serv_large_file = serv_input_file;
 
-		while(n < 2) // to send only two packets
+		while(n < MAX_NUM_PACKETS) // to send only two packets
 		{
 			// get one data block size data <=512
         	char* serv_one_data = get_one_packet_data(serv_large_file);
@@ -144,7 +144,7 @@ int main(int argc, char* argv[])
 
 		int n = 0; //loop counter
         int block_counter = 1; //block counter
-		while(n < 2) // to recive only two packets
+		while(n < MAX_NUM_PACKETS) // to recive only two packets
 		{
 			// recv data packet
 			bzero(buffer, sizeof(buffer));
