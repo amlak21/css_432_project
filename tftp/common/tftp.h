@@ -9,10 +9,17 @@
 #include <signal.h>         // for the signal handler registration.
 #include <unistd.h>
 
+
+#define SERV_UDP_PORT 51091 //PORT NUMBER 
+#define MAX_NUM_PACKETS 25  // maximum number of packets
+#define MAX_FILE_SIZE 12000000 //12 MB 
+
+
 // constants for data packet
 const static int MAX_BUFFER_SIZE_DP = 516;
 const static unsigned short OP_CODE_DATA = 3;
 const static int DATA_OFFSET = 4; //
+const static int MAX_DATA_SIZE = 512;
 
 //constants for RRQ and WRQ paket
 const static unsigned short OP_CODE_RRQ = 1;
@@ -26,10 +33,11 @@ const static unsigned short OP_CODE_ACK = 4;
 // constants for Error packet
 const static unsigned short OP_CODE_ERR = 5;
 
+
 char* create_ACK_packet(int block)
 {
     char *buffer = malloc(4);
-    bzero(buffer, sizeof(buffer));
+    bzero(buffer, strlen(buffer)); 
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_ACK); // add opcode data at empty buffer
     opCodePtr++; 
@@ -39,10 +47,11 @@ char* create_ACK_packet(int block)
     return buffer;
 }
 
+
 char* create_WRQ_packet(char* input_file)
 {
     char *buffer = malloc (4 + strlen(input_file)+ strlen(MODE));
-    bzero(buffer, sizeof(buffer));
+    bzero(buffer, strlen(buffer));
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_WRQ); // add opcode data at empty buffer
 	
@@ -59,7 +68,7 @@ char* create_WRQ_packet(char* input_file)
 char* create_RRQ_packet(char* input_file)
 {
     char *buffer = malloc(9 + strlen(input_file));
-    bzero(buffer, sizeof(buffer));
+    bzero(buffer, strlen(buffer));
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_RRQ); // add opcode data at empty buffer
 
@@ -76,9 +85,9 @@ char* create_RRQ_packet(char* input_file)
 // input is one data block size file <=512 bytes
 char* create_data_packet(int block, char* one_data_file)
 {
-     char *buffer = malloc(MAX_BUFFER_SIZE_DP);
-    bzero(buffer, sizeof(buffer));
-    
+    char *buffer = malloc(MAX_BUFFER_SIZE_DP);
+    bzero(buffer, MAX_BUFFER_SIZE_DP);
+
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_DATA); // add opcode data at empty buffer
     opCodePtr++; //pointing to 3rd byte.
@@ -89,37 +98,40 @@ char* create_data_packet(int block, char* one_data_file)
      
     char *file_data = buffer + DATA_OFFSET; //point to the 5th offset
     char *file = one_data_file;
-    strncpy (file_data, file, strlen(file)); // bcopy , memcpy
-
+    
+    memcpy(file_data, file, strlen(file)); // bcopy , memcpy
     return buffer;
 }
+
 // for data file
     //store the input file in some buffer
     // read the next 512 byte(untill last ) and return one data packet size file <= 512
-char* get_one_packet_data(char* input_file) // need to be tested
+char* get_one_packet_data(char* input_file) // tested
 {
-    char* one_data_buffer = malloc(512);
+    char* file = input_file;
+   char *buffer = malloc(MAX_DATA_SIZE + 1);
+    if(strlen(file) > MAX_DATA_SIZE) 
+    {
+        bzero(buffer, MAX_DATA_SIZE + 1);
+        memcpy (buffer, file, MAX_DATA_SIZE);   // copy only 512 bytes
+        printf("\nthe buffer inside is: \n %s\n", buffer);
+    }
 
-    bzero(one_data_buffer, sizeof(one_data_buffer));
-    if(sizeof(input_file) > 512)
+    else if(strlen(file) <= MAX_DATA_SIZE)
     {
-        // copy 512 bytes
-        strncpy (one_data_buffer, input_file, 512);
+        bzero(buffer, MAX_DATA_SIZE + 1);
+        memcpy(buffer, file, strlen(file)+ 1);  // copy all of bytes
     }
-    else if(sizeof(input_file) < 512)
-    {
-        // copy size of large buffer
-        strncpy (one_data_buffer, input_file,strlen(input_file));
-    }
-    // return 512 bytes
-    return one_data_buffer;
+    return buffer; // return one packet size data
+
 }
+
 
 
 char* create_ERR_packet(char* err_code, char* err_msg)
 {
     char *buffer = malloc (5 + strlen(err_msg));
-    bzero(buffer, sizeof(buffer));
+    bzero(buffer, strlen(buffer));
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_ERR); // add opcode data at empty buffer
     
@@ -142,9 +154,12 @@ char* get_file_data(char* data_packet)
 {
     char* buffer = data_packet;
     char* file_ptr = buffer + DATA_OFFSET; // point at 5th offset
-    char *file = malloc(strlen(file_ptr));
-    strncpy (file, file_ptr, strlen(file_ptr));
-    return file; // return the actual file data
+    char *file = malloc(MAX_DATA_SIZE);
+    bzero(file, MAX_DATA_SIZE);
+    char *data = file;
+    memcpy (data, file_ptr,MAX_DATA_SIZE );
+    return file;
+ 
 }
 
 // for data and acknoledegment packet
@@ -158,3 +173,4 @@ unsigned short get_block_number(char* packet)
 // implement
 // get error code 
 // get error mesg
+// get file name from RRQ/WRQ
