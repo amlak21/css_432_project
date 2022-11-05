@@ -58,6 +58,7 @@ int main(int argc, char* argv[])
 	}
 
 	printf("%s: waiting to receive request\n",prog_name);
+	
 	for(; ; )
 	{
 
@@ -114,9 +115,37 @@ int main(int argc, char* argv[])
 
 		int n = 0; //loop counter
         int block_counter = 1; //block counter
-		char* serv_large_file = serv_input_file;
+		char* serv_large_file = f_array;
+		//char* serv_large_file = f_array;
 
-		while(n < 2) // to send only two packets
+
+//////////////////
+/*
+		// while loop - for number of packets
+		while(strlen(serv_large_file) > 512)
+		{
+			char* current_bytes = serv_large_file; //
+			char* serv_one_data = get_one_packet_data(current_bytes); // get first 512 bytes
+
+
+
+			
+			serv_large_file + 512; // increment by 512 bytes
+			// send data
+			// receive acknowledge
+
+		}
+		// send the last data
+		// block_counter++ for block
+		char* serv_one_data = get_one_packet_data(serv_large_file); // get first 512 bytes
+		// send last data packet
+		// recieve acknoledege
+
+*/
+///////////////
+
+
+		while(n < MAX_NUM_PACKETS) // to send only two packets
 		{
 			// get one data block size data <=512
 		
@@ -194,7 +223,7 @@ int main(int argc, char* argv[])
 
 		int n = 0; //loop counter
         int block_counter = 1; //block counter
-		while(n < 2) // to recive only two packets
+		while(n < MAX_NUM_PACKETS) // to recive only two packets
 		{
 			// recv data packet
 			bzero(buffer, sizeof(buffer));
@@ -249,7 +278,3 @@ int main(int argc, char* argv[])
 	
 	}
 }
-
-
-
-
