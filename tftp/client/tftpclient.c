@@ -3,6 +3,7 @@
 char *prog_name; // pointer to program name
 //#define MAXLINE 512 // size of data to be sent
 #define MAX_BUFFER_SIZE 516
+const size_t MAX_FILE_LEN = 60000 ; // upt tp  12 MB file to read/write
                    
 
 int main(int argc, char* argv[])
@@ -92,36 +93,24 @@ int main(int argc, char* argv[])
         printf("%s: sent RRQ to %s\n", prog_name, serv_host_addr);
          
         
-        int n = 0;
-        while(n < MAX_NUM_PACKETS) // need while(true)
+        //int n = 0;
+        while(1) //infinite while loop
         {
-            // recvfrom data block #1 - recieve until server done sending - need some loop
             bzero(buffer,sizeof(buffer));
             if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
             {
                 printf("%s: data block recvfrom error\n",prog_name);
 			    exit(4);
             }
-            //printf("%s: recived %d bytes from %s\n", prog_name, packet_bytes, serv_host_addr);
+
             printf("%s: recived packet \n",prog_name);
-
-
-
-
-        //test
-
             opcode = get_opcode(buffer);
             block_number = get_block_number(buffer);
-            // maybe use switch
+            
             if(opcode == 3) //data packet
             {
-                //printf("\n length of buffer\n %d\n", strlen(buffer));
                 char* buffer_rcvd = buffer;
-
                 char* data_file = get_file_data(buffer_rcvd);
-                
-               // printf("\n length of data file\n %d\n", strlen(data_file));
-
                 printf("    packet contains data block: %d with %d bytes\n", block_number,strlen(data_file) );
 
                 // open the file
@@ -129,24 +118,18 @@ int main(int argc, char* argv[])
                 // parse data block
                 // copy the file - copy it at large buffer and then write that buffer to file
 
-                // send ack and track ack block - send until server done sending and once after it is done
+                //deallocate after done writing
 
-                /////////////////
-               // if(strlen(data_file) < 512) // reciving last data file
-                //{
-                   // break;
-               // }
-
-                /////////////
-
-                char* ACK_packet = create_ACK_packet(block_number); 
-
+                if(strlen(data_file) < 512) // reciving last data file
+                {
+                    break;
+                }
+                
+                char* ACK_packet = create_ACK_packet(block_number); // creat ack packet
                 bzero(buffer,sizeof(buffer));
                 memcpy(buffer,ACK_packet, sizeof(buffer));
 
                  // deallocate ACK_packet
-
-
 
                 if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
                 {
@@ -154,10 +137,7 @@ int main(int argc, char* argv[])
 			        exit(1);
                 }
                 printf("%s: sent ACK block: %d to %s\n", prog_name, block_number, serv_host_addr);
-
-               
-                n++;
-        
+                //n++;
             }
 
 
@@ -171,20 +151,24 @@ int main(int argc, char* argv[])
 
         }
         // after break from the loop
-            // last data block have been receivec
+        printf("%s: has already recived last data block \n",prog_name);
+
         // send last acknoledge
-            // create ack packet
-            // copy it 
-            // deallocate ack packet
-            //sent last ack
+        char* ACK_packet = create_ACK_packet(block_number); // creat ack packet
+        bzero(buffer,sizeof(buffer));
+        memcpy(buffer,ACK_packet, sizeof(buffer));
 
+        // deallocate ACK_packet
 
+        if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
+        {
+            printf("%s: ack sendto error on socket\n",prog_name);
+			exit(1);
+        }
+        printf("%s: sent last ACK block: %d to %s\n", prog_name, block_number, serv_host_addr);
 
-
-
-        
-
-        // deallocate RRQ_packet when done
+        // deallocate ack packet
+            
         
     }
     //if WRQ
@@ -216,33 +200,47 @@ int main(int argc, char* argv[])
         }
        // printf("%s: recived %d bytes from %s\n", prog_name, packet_bytes, serv_host_addr);
 
-      printf("%s: recived packet\n", prog_name);
+        printf("%s: recived packet\n", prog_name);
         opcode = get_opcode(buffer);
         block_number = get_block_number(buffer);
 
-       
-     
-        
         if(opcode == 4) // ack packet
         {
             printf("    packet contains ack block: %d\n", block_number);
 
-            int n = 0; //loop counter
-            int block_counter = 1; //block counter
-            char* large_file = input_file;
+            // starts writing once it get ack
+            //const size_t MAX_LEN = 1600; 
+    	    FILE * fp;
+    	    char f_array[ MAX_FILE_LEN +1];
+    	    int c;
+    	    size_t i = -1; //
+    	    f_array[ MAX_FILE_LEN +1] = 0;
+    	    fp = fopen(argv[3],"r");   // argv[3] - input file
 
-            while(n < MAX_NUM_PACKETS) // to send only two packets
+    	    if ( NULL == fp )
+		    {
+        	    perror("Error opening file");
+		    }
+
+    	    else 
+		    {
+        	    while ( EOF != (c = fgetc( fp )) && ++i < MAX_FILE_LEN )
+            	    f_array[ i ] = c;
+
+        	    fclose (fp);
+    	    }
+    	    f_array[ i ] = 0;
+
+            int block_counter = 1; //block counter
+            char* large_file = f_array;
+
+            while(strlen(large_file) > 512) // 
             {
+                char* current_bytes = large_file; 
+
                 // get one data block size data <=512
-                char* one_data = get_one_packet_data(large_file);
-                // increment large file by 512
-                if(sizeof(large_file) > 512)
-                {
-                    large_file + 512; // incerement
-                }
-                // create data packet
+                char* one_data = get_one_packet_data(current_bytes);
                 char* data_packet = create_data_packet(block_counter, one_data);
-                // send data block #1
 
                 bzero(buffer,sizeof(buffer));
                 memcpy(buffer,data_packet, sizeof(buffer));
@@ -255,7 +253,7 @@ int main(int argc, char* argv[])
 			        exit(1);
                 }
             
-                printf("%s: sent data block: %d to %s\n", prog_name,block_counter, serv_host_addr);
+                printf("%s: sent data block: %d with %d bytes to %s\n", prog_name,block_counter, strlen(one_data),serv_host_addr);
                 
                 // rceive ack
                 bzero(buffer,sizeof(buffer));
@@ -264,23 +262,42 @@ int main(int argc, char* argv[])
                     printf("%s: ack recvfrom error\n",prog_name);
 			        exit(4);
                 }
-                //printf("%s: recived %d bytes from %s\n", prog_name, packet_bytes, serv_host_addr);
-
                 printf("%s: recived packet\n", prog_name);
                 printf("    packet contains ack block: %d\n", block_counter);
                 block_counter++;
-                n++;
-            // create data block using 512 byets of input file - increment block
-            // increment pointer to next 512 bytes of input file
-            // compare size - if less than - "send last data block"
-            // send out data block #1 - send untill the data is done - need some loop
-            // recieve ack block #1
-                
-         
-
+                char* increment = large_file + 512;
+                large_file = increment;
+                //n++;
             }
+            // send last data block
+            char* one_data = get_one_packet_data(large_file);
+            char* data_packet = create_data_packet(block_counter, one_data);
+
+            bzero(buffer,sizeof(buffer));
+            memcpy(buffer,data_packet, sizeof(buffer));
+
+            //deallocate data packet
+
+            if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
+            {
+                printf("%s: data block send to error on socket\n",prog_name);
+			    exit(1);
+            }
+            printf("%s: sent last data block: %d with %d bytes to %s\n", prog_name,block_counter, strlen(one_data),serv_host_addr);
+            bzero(buffer,sizeof(buffer));
+
+            //receive last ack
+            if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+            {
+                printf("%s: ack recvfrom error\n",prog_name);
+			    exit(4);
+            }
+            printf("%s: recived packet\n", prog_name);
+            printf("    packet contains last ack block: %d\n", block_counter);
+
             
         }
+
         //else if //error packet
         else // send request again after sometime ?
         {
