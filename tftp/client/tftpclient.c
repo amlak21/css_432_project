@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
          
         
         int n = 0;
-        while(n < MAX_NUM_PACKETS) // need while(true)
+        while(n < 2)
         {
             // recvfrom data block #1 - recieve until server done sending - need some loop
             bzero(buffer,sizeof(buffer));
@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
             int block_counter = 1; //block counter
             char* large_file = input_file;
 
-            while(n < MAX_NUM_PACKETS) // to send only two packets
+            while(n < 2) // to send only two packets
             {
                 // get one data block size data <=512
                 char* one_data = get_one_packet_data(large_file);
