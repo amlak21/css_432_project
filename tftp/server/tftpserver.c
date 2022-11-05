@@ -6,6 +6,7 @@ char *prog_name;
 //#define MAXMESG 2048
 //#define REQUEST_BUFFER_SIZE 50
 #define MAX_BUFFER_SIZE 516
+const size_t MAX_FILE_LEN = 60000 ; // upt tp  12 MB file to read/write
 
 
 int main(int argc, char* argv[])
@@ -84,12 +85,12 @@ int main(int argc, char* argv[])
 
 		// get open the file to send
 		
-		const size_t MAX_LEN = 512; 
+		//const size_t MAX_LEN = 700; 
     	FILE * fp;
-    	char f_array[ MAX_LEN +1];
+    	char f_array[ MAX_FILE_LEN +1];
     	int c;
     	size_t i = -1;
-    	f_array[ MAX_LEN +1] = 0;
+    	f_array[ MAX_FILE_LEN +1] = 0;
 
     	//char file_name[] = "hi.txt";
     	//char*f = file_name;
@@ -103,72 +104,27 @@ int main(int argc, char* argv[])
 
     	else 
 		{
-        	while ( EOF != (c = fgetc( fp )) && ++i < MAX_LEN )
+        	while ( EOF != (c = fgetc( fp )) && ++i < MAX_FILE_LEN )
             	f_array[ i ] = c;
 
         	fclose (fp);
     	}
     	f_array[ i ] = 0;
 
-   		//char* file34 = f_array;
-		 //printf("\nThe content: \n%s\n", f_array);
-
-		int n = 0; //loop counter
         int block_counter = 1; //block counter
 		char* serv_large_file = f_array;
-		//char* serv_large_file = f_array;
-
-
-//////////////////
-/*
+		
 		// while loop - for number of packets
 		while(strlen(serv_large_file) > 512)
 		{
 			char* current_bytes = serv_large_file; //
 			char* serv_one_data = get_one_packet_data(current_bytes); // get first 512 bytes
-
-
-
-			
-			serv_large_file + 512; // increment by 512 bytes
-			// send data
-			// receive acknowledge
-
-		}
-		// send the last data
-		// block_counter++ for block
-		char* serv_one_data = get_one_packet_data(serv_large_file); // get first 512 bytes
-		// send last data packet
-		// recieve acknoledege
-
-*/
-///////////////
-
-
-		while(n < MAX_NUM_PACKETS) // to send only two packets
-		{
-			// get one data block size data <=512
-		
-        	char* serv_one_data = get_one_packet_data(serv_large_file);
-			//printf("\n length of one:\n%d\n", strlen(serv_one_data));
-
-			// increment large file by 512
-			//printf("\n length of large:\n%d\n", strlen(serv_large_file));
-
-        	if(strlen(serv_large_file) > 512)
-        	{
-            	serv_large_file + 512; // incerement by 512
-        	}
-        	// create data packet
-
-        	char* data_packet = create_data_packet(block_counter, serv_one_data);
+        	char* data_packet = create_data_packet(block_counter, serv_one_data); // create data packet
 			
 			// send data block 1
 			bzero(buffer, sizeof(buffer));
-		
 			memcpy(buffer,data_packet, sizeof(buffer));
 
-	
 			// deallocate data packet
 
 			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
@@ -178,8 +134,7 @@ int main(int argc, char* argv[])
             }
           
             printf("%s: sent data block: %d with %d bytes\n", prog_name,block_counter,strlen(serv_one_data) );
-    
-			
+
 			// recv ack #1
 			bzero(buffer, sizeof(buffer));
 			if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
@@ -187,19 +142,43 @@ int main(int argc, char* argv[])
             	printf("%s: ack recvfrom error\n",prog_name);
 				exit(4);
             }
-            
-			
-			//printf("%s: recived %d bytes from client\n", prog_name, packet_bytes);
 
-			 printf("%s: recived packet\n", prog_name);
+			printf("%s: recived packet\n", prog_name);
             printf("    packet contains ack block: %d\n", block_counter);
-			block_counter++;
-            n++;
+			block_counter++; //increment block number
+           // n++;
+			char* increment = serv_large_file + 512; // increment by 512 bytes
+			serv_large_file = increment;
 
-
-			
 		}
-		
+
+		char* serv_one_data = get_one_packet_data(serv_large_file); // get first 512 bytes
+		char* data_packet = create_data_packet(block_counter, serv_one_data); //create data packet
+		bzero(buffer, sizeof(buffer));
+		memcpy(buffer,data_packet, sizeof(buffer)); //copy data packet to buffer
+		// deallocate data packet
+
+		if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+        {
+            printf("%s: data block send to error on socket\n",prog_name);
+			exit(1);
+        }
+        printf("%s: sent last data block: %d with %d bytes\n", prog_name,block_counter,strlen(serv_one_data) );
+
+		// recieve acknoledege
+		bzero(buffer, sizeof(buffer));
+		if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+        {
+            printf("%s: ack recvfrom error\n",prog_name);
+			exit(4);
+        }
+		printf("%s: recived packet\n", prog_name);
+        printf("    packet contains last ack block: %d\n", block_counter);
+
+
+
+
+
 	}
 
 	else if(opcode == 2) // WRQ
@@ -219,11 +198,11 @@ int main(int argc, char* argv[])
             printf("%s: ack block send to error on socket\n",prog_name);
 			exit(1);
         }
-		printf("%s: sent ack block: %d to client\n", prog_name,0);
+		printf("%s: sent ack block: %d \n", prog_name,0);
 
-		int n = 0; //loop counter
-        int block_counter = 1; //block counter
-		while(n < MAX_NUM_PACKETS) // to recive only two packets
+		//int n = 0; //loop counter
+        //int block_counter = 1; //block counter
+		while(1) 
 		{
 			// recv data packet
 			bzero(buffer, sizeof(buffer));
@@ -232,42 +211,68 @@ int main(int argc, char* argv[])
         		printf("%s: data block recvfrom error\n",prog_name);
 				exit(4);
         	}
-        	//printf("%s: recived %d bytes from client\n", prog_name, packet_bytes);
 
 			printf("%s: recived packet\n", prog_name);
-        	printf("    packet contains data block: %d\n", block_counter);
 
-			// parse data
+			opcode = get_opcode(buffer);
+			block_number = get_block_number(buffer);
 
+			if(opcode == 3)
+			{
+				char* buffer_rcvd = buffer;
+				char* data_file = get_file_data(buffer_rcvd);
+				printf("    packet contains data block: %d with %d bytes\n", block_number, strlen(data_file));
 
+				// open the file
+                // check if not empty
+                // parse data block
+                // copy the file - copy it at large buffer and then write that buffer to file
 
-			// deallocate data packet after done writing
-		
-			//create ack packet
-			char* ACK_packet_1 = create_ACK_packet(block_counter);
+				// deallocate data packet after done writing
 
-			// send ack #0
-			bzero(buffer, sizeof(buffer));
-			memcpy(buffer,ACK_packet_1, sizeof(buffer));
+				if(strlen(data_file) < 512)
+				{
+					break;
+				}
+				//create ack packet
+				char* ACK_packet_1 = create_ACK_packet(block_number);
+				bzero(buffer, sizeof(buffer));
+				memcpy(buffer,ACK_packet_1, sizeof(buffer));
 
-			// deallocate ack packet_1
+				// deallocate ack packet_1
 
+				if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+        		{
+            		printf("%s: ack block send to error on socket\n",prog_name);
+					exit(1);
+        		}
+				printf("%s: sent ack block: %d \n", prog_name,block_number);
+				
+			}
 
-			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
-        	{
-            	printf("%s: ack block send to error on socket\n",prog_name);
-				exit(1);
-        	}
-			printf("%s: sent ack block: %d to client\n", prog_name,block_counter);
-			block_counter++;
-			n++;
-
-
-			
+			 //else if(opcode == 5) // error packet
+            //{
+            // get error msg
+            // get error code
+            //printf("packet contains an error packet: error code: %s, error msg: %s\n", error code,error msg) );
+            //what to do when recieving error packet
+            //}	
 
 		}
+		// break from loop
+		printf("%s: has already recived last data block \n",prog_name);
+		char* ACK_packet_1 = create_ACK_packet(block_number);
+		bzero(buffer, sizeof(buffer));
+		memcpy(buffer,ACK_packet_1, sizeof(buffer));
 
-		
+		// deallocate ack packet_1
+
+		if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+        {
+            printf("%s: ack block send to error on socket\n",prog_name);
+			exit(1);
+        }
+		printf("%s: sent last ack block: %d \n", prog_name,block_number);
 		
 	}
 	else // Wrong reqest
