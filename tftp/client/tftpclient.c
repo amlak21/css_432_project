@@ -13,6 +13,7 @@ int main(int argc, char* argv[])
     char buffer[MAX_BUFFER_SIZE];  // store recived data packet
     //char file_buffer[MAX_FILE_SIZE]; // store all received data file to be written on a file
 
+    int port_number = SERV_UDP_PORT;
 
     unsigned short  opcode; // store opcode
     unsigned short block_number; // store block number - data and ack packet
@@ -23,11 +24,22 @@ int main(int argc, char* argv[])
     struct sockaddr_in  cli_addr, serv_addr, *addr_ptr;
 
     // prog_name, RQ, srv_addr, file
-    if(argc != 4) // check number of arguments
+     if((argc == 4) || (argc == 6)) // check number of arguments
     {
-        fprintf(stderr,"Client rorr: Invalid number of argumnets\n");
-        exit(1);
-    }
+	  	if (argc == 6)
+		{
+	 		if(strcmp(argv[4], "-P") == 0 || strcmp(argv[4], "-p") == 0)
+		 	{
+			  port_number = atoi(argv[5]);
+		 	}
+		}
+	}
+	else
+	{
+		fprintf(stderr,"Server erorr: Invalid number of argumnets\n");
+         exit(1);
+	}
+
 
     // command line input order - program name, request, server IP, data file
     prog_name = argv[0];
@@ -43,7 +55,7 @@ int main(int argc, char* argv[])
     serv_addr.sin_family      = AF_INET; //set address family to internet address
  
     serv_addr.sin_addr.s_addr = inet_addr(serv_host_addr); 
-    serv_addr.sin_port        = htons(SERV_UDP_PORT); // set port
+    serv_addr.sin_port        = htons(port_number); // set port
 
     //Create the socket for the client side.                          
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
