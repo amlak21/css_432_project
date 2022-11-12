@@ -6,7 +6,7 @@ char *prog_name;
 //#define MAXMESG 2048
 //#define REQUEST_BUFFER_SIZE 50
 #define MAX_BUFFER_SIZE 516
-const size_t MAX_FILE_LEN = 60000 ; // upt tp  12 MB file to read/write
+const size_t MAX_FILE_LEN = 60000 ; // need to be up to 12 MB file to read/write ?????????????????
 
 
 int main(int argc, char* argv[])
@@ -22,6 +22,10 @@ int main(int argc, char* argv[])
 
 	unsigned short opcode; // store opcode
     unsigned short block_number; // store block number - data and ack packet
+	unsigned short error_code;	//store error code
+	char error_msg[]= ""; // store error message
+
+
 	struct sockaddr_in serv_addr;
 
 	struct sockaddr pcli_addr; //ptr to client address 
@@ -82,9 +86,8 @@ int main(int argc, char* argv[])
 	if(opcode == 1) //RRQ
 	{
 		printf("%s: receievd RRQ \n",prog_name);
-
-		// get open the file to send
 		
+		// check if file exist,or permission to access to access
 		//const size_t MAX_LEN = 700; 
     	FILE * fp;
     	char f_array[ MAX_FILE_LEN +1];
@@ -97,10 +100,49 @@ int main(int argc, char* argv[])
 
     	fp = fopen(argv[1],"r");
 
-    	if ( NULL == fp )
+    	if ( access(argv[1], F_OK) == -1) // check if file exists      //NULL == fp
 		{
-        	perror("Error opening file");
+        	
+			printf("%s: Erorr: File Does Not Exist\n",prog_name);
+			error_code = 1 ; // set error code to 1
+			strcat(error_msg, "File Does Not Exist"); // set error message
+
 		}
+
+		// check for file read access permission
+		else if(access(argv[1], R_OK) == -1)
+		{
+			printf("%s: ERROR: No permission to access a file\n",prog_name);
+			error_code = 2; // set error code to 2
+			strcat(error_msg, "No Read Permission"); // set error message
+			
+		}
+
+
+
+		// send error packet if doesnt exist or no permission to read
+		if((access(argv[1], F_OK) == -1 ) || (access(argv[1], R_OK) == -1))
+		{
+			// create error packet
+			char* error_packet = create_ERR_packet(error_code, error_msg);
+
+			bzero(buffer, sizeof(buffer));
+			memcpy(buffer,error_packet, sizeof(buffer));
+
+			free(error_packet); // deallocate error_packet
+
+			// send error packet
+			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+            {
+                printf("%s: error packet send to error on socket\n",prog_name);
+			    exit(1);
+            }
+          
+            printf("%s: sent error packet with error code: %d\n", prog_name, error_code);
+			opcode = 5; 
+
+		}
+			
 
     	else 
 		{
@@ -125,7 +167,7 @@ int main(int argc, char* argv[])
 			bzero(buffer, sizeof(buffer));
 			memcpy(buffer,data_packet, sizeof(buffer));
 
-			// deallocate data packet
+			free(data_packet); // deallocate data packet
 
 			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
             {
@@ -134,6 +176,7 @@ int main(int argc, char* argv[])
             }
           
             printf("%s: sent data block: %d with %d bytes\n", prog_name,block_counter,strlen(serv_one_data) );
+			free(serv_one_data); 
 
 			// recv ack #1
 			bzero(buffer, sizeof(buffer));
@@ -152,127 +195,154 @@ int main(int argc, char* argv[])
 
 		}
 
-		char* serv_one_data = get_one_packet_data(serv_large_file); // get first 512 bytes
-		char* data_packet = create_data_packet(block_counter, serv_one_data); //create data packet
-		bzero(buffer, sizeof(buffer));
-		memcpy(buffer,data_packet, sizeof(buffer)); //copy data packet to buffer
-		// deallocate data packet
+		if(opcode != 5) //if error packt was sent do nothing
+		{
+			char* serv_one_data = get_one_packet_data(serv_large_file); // get first 512 bytes
+			char* data_packet = create_data_packet(block_counter, serv_one_data); //create data packet
+			bzero(buffer, sizeof(buffer));
+			memcpy(buffer,data_packet, sizeof(buffer)); //copy data packet to buffer
+			free(data_packet); // deallocate data packet
 
-		if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
-        {
-            printf("%s: data block send to error on socket\n",prog_name);
-			exit(1);
-        }
-        printf("%s: sent last data block: %d with %d bytes\n", prog_name,block_counter,strlen(serv_one_data) );
+			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+        	{
+            	printf("%s: data block send to error on socket\n",prog_name);
+				exit(1);
+        	}
+	
+        	printf("%s: sent last data block: %d with %d bytes\n", prog_name,block_counter,strlen(serv_one_data) );
+			free(serv_one_data);
 
-		// recieve acknoledege
-		bzero(buffer, sizeof(buffer));
-		if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
-        {
-            printf("%s: ack recvfrom error\n",prog_name);
-			exit(4);
-        }
-		printf("%s: recived packet\n", prog_name);
-        printf("    packet contains last ack block: %d\n", block_counter);
+			// recieve acknoledege
+			bzero(buffer, sizeof(buffer));
+			if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+        	{
+            	printf("%s: ack recvfrom error\n",prog_name);
+				exit(4);
+        	}
+			printf("%s: recived packet\n", prog_name);
+        	printf("    packet contains last ack block: %d\n", block_counter);
 
 
-
+		}
 
 
 	}
 
 	else if(opcode == 2) // WRQ
 	{
-		printf("%s: receievd WRQ \n",prog_name);
-		//create ack packet
-		char* ACK_packet = create_ACK_packet(0);
-
-		// send ack #0
-		bzero(buffer, sizeof(buffer));
-		memcpy(buffer,ACK_packet, sizeof(buffer));
-
-		// deallocate ack packet 0
-
-		if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
-        {
-            printf("%s: ack block send to error on socket\n",prog_name);
-			exit(1);
-        }
-		printf("%s: sent ack block: %d \n", prog_name,0);
-
-		//int n = 0; //loop counter
-        //int block_counter = 1; //block counter
-		while(1) 
+		printf("%s: receievd WRQ\n",prog_name);
+		
+		if ( access(argv[1], F_OK) == 0) //if file already exists
 		{
-			// recv data packet
+			printf("%s: ERROR: File Already Exists\n",prog_name);
+			error_code = 6; // set error code to 6
+			strcat(error_msg, "File Already Exists"); // set error message
+
+			// create error packet
+			char* error_packet = create_ERR_packet(error_code, error_msg);
+
 			bzero(buffer, sizeof(buffer));
-			if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+			memcpy(buffer,error_packet, sizeof(buffer));
+
+			free(error_packet); // deallocate error_packet
+
+			// send error packet
+			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+            {
+                printf("%s: error packet send to error on socket\n",prog_name);
+			    exit(1);
+            }
+          
+            printf("%s: sent error packet with error code: %d\n", prog_name, error_code);
+			opcode = 5;
+		} 
+
+			
+		if(opcode != 5)
+		{
+			//create ack packet
+			char* ACK_packet = create_ACK_packet(0);
+
+			// send ack #0
+			bzero(buffer, sizeof(buffer));
+			memcpy(buffer,ACK_packet, sizeof(buffer));
+			free(ACK_packet); // deallocate ack packet 0
+
+			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
         	{
-        		printf("%s: data block recvfrom error\n",prog_name);
-				exit(4);
+            	printf("%s: ack block send to error on socket\n",prog_name);
+				exit(1);
         	}
+			printf("%s: sent ack block: %d \n", prog_name,0);
 
-			printf("%s: recived packet\n", prog_name);
-
-			opcode = get_opcode(buffer);
-			block_number = get_block_number(buffer);
-
-			if(opcode == 3)
+		
+			while(1) 
 			{
-				char* buffer_rcvd = buffer;
-				char* data_file = get_file_data(buffer_rcvd);
-				printf("    packet contains data block: %d with %d bytes\n", block_number, strlen(data_file));
-
-				// open the file
-                // check if not empty
-                // parse data block
-                // copy the file - copy it at large buffer and then write that buffer to file
-
-				// deallocate data packet after done writing
-
-				if(strlen(data_file) < 512)
-				{
-					break;
-				}
-				//create ack packet
-				char* ACK_packet_1 = create_ACK_packet(block_number);
+				// recv data packet
 				bzero(buffer, sizeof(buffer));
-				memcpy(buffer,ACK_packet_1, sizeof(buffer));
-
-				// deallocate ack packet_1
-
-				if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+				if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
         		{
-            		printf("%s: ack block send to error on socket\n",prog_name);
-					exit(1);
+        			printf("%s: data block recvfrom error\n",prog_name);
+					exit(4);
         		}
-				printf("%s: sent ack block: %d \n", prog_name,block_number);
+
+				printf("%s: recived packet\n", prog_name);
+
+				opcode = get_opcode(buffer);
+				block_number = get_block_number(buffer);
+
+				if(opcode == 3)
+				{
+					char* buffer_rcvd = buffer;
+					char* data_file = get_file_data(buffer_rcvd);
+					printf("    packet contains data block: %d with %d bytes\n", block_number, strlen(data_file));
+
+					// open the file
+                	// check if not empty
+                	// parse data block
+                	// copy the file - copy it at large buffer and then write that buffer to file
+
+					// deallocate data packet after done writing
+
+					if(strlen(data_file) < 512)
+					{
+						free(data_file);
+						break;
+					}
+					free(data_file);
+
+					//create ack packet
+					char* ACK_packet_1 = create_ACK_packet(block_number);
+					bzero(buffer, sizeof(buffer));
+					memcpy(buffer,ACK_packet_1, sizeof(buffer));
+					free(ACK_packet_1); // deallocate ack packet_1
+
+					if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+        			{
+            			printf("%s: ack block send to error on socket\n",prog_name);
+						exit(1);
+        			}
+					printf("%s: sent ack block: %d \n", prog_name,block_number);
 				
+				}
+
 			}
+			// break from loop
+			printf("%s: has already recived last data block \n",prog_name);
+			char* ACK_packet_1 = create_ACK_packet(block_number);
+			bzero(buffer, sizeof(buffer));
+			memcpy(buffer,ACK_packet_1, sizeof(buffer));
+			free(ACK_packet_1); // deallocate ack packet_1
 
-			 //else if(opcode == 5) // error packet
-            //{
-            // get error msg
-            // get error code
-            //printf("packet contains an error packet: error code: %s, error msg: %s\n", error code,error msg) );
-            //what to do when recieving error packet
-            //}	
-
+			if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
+        	{
+            	printf("%s: ack block send to error on socket\n",prog_name);
+				exit(1);
+        	}
+			printf("%s: sent last ack block: %d \n", prog_name,block_number);
 		}
-		// break from loop
-		printf("%s: has already recived last data block \n",prog_name);
-		char* ACK_packet_1 = create_ACK_packet(block_number);
-		bzero(buffer, sizeof(buffer));
-		memcpy(buffer,ACK_packet_1, sizeof(buffer));
 
-		// deallocate ack packet_1
-
-		if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
-        {
-            printf("%s: ack block send to error on socket\n",prog_name);
-			exit(1);
-        }
-		printf("%s: sent last ack block: %d \n", prog_name,block_number);
+		
 		
 	}
 	else // Wrong reqest
