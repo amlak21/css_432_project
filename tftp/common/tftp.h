@@ -114,7 +114,6 @@ char* get_one_packet_data(char* input_file) // tested
     {
         bzero(buffer, MAX_DATA_SIZE + 1);
         memcpy (buffer, file, MAX_DATA_SIZE);   // copy only 512 bytes
-        printf("\nthe buffer inside is: \n %s\n", buffer);
     }
 
     else if(strlen(file) <= MAX_DATA_SIZE)
@@ -128,15 +127,20 @@ char* get_one_packet_data(char* input_file) // tested
 
 
 
-char* create_ERR_packet(char* err_code, char* err_msg)
+char* create_ERR_packet(int err_code, char* err_msg)
 {
     char *buffer = malloc (5 + strlen(err_msg));
     bzero(buffer, strlen(buffer));
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_ERR); // add opcode data at empty buffer
+     opCodePtr++; //pointing to 3rd byte.
+
+    unsigned short err_code_num = (unsigned short)err_code;
+    unsigned short *err_code_ptr = opCodePtr;
+    *err_code_ptr = htons(err_code_num); // add error code to buffer
     
-    char* file_string = buffer + OPCODE_OFFSET; // point at 3rd byte
-    strcat(file_string, err_code);
+    char* file_string = buffer + DATA_OFFSET; // point at 5th byte
+    //strcat(file_string, err_code);
 	strcat(file_string, err_msg);
     return buffer;
 }
@@ -170,6 +174,13 @@ unsigned short get_block_number(char* packet)
     return block_num; // return block number
 }
 
-// implement
 // get error code 
+
+unsigned short get_error_code(char* packet)
+{
+    unsigned short *err_num_ptr = (unsigned short*) packet + 1; 
+    unsigned short err_code = ntohs(*err_num_ptr);
+    return err_code; // return block number
+}
+
 // get error mesg

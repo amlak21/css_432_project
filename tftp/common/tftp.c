@@ -28,6 +28,7 @@ const static unsigned short OP_CODE_ACK = 4;
 
 // constants for Error packet
 const static unsigned short OP_CODE_ERR = 5;
+
 /*
 
 char* create_ACK_packet(int block)
@@ -76,7 +77,7 @@ char* create_RRQ_packet(char* input_file)
     strcat(file_string, MODE);
     return buffer; 
 }
-*/
+
 // create packet from one data blcok size file
 // input is one data block size file <=512 bytes
 char* create_data_packet(int block, char* one_data_file)
@@ -122,19 +123,26 @@ char* get_one_packet_data(char* input_file) // tested
 
 }
 
-/*
-char* create_ERR_packet(char* err_code, char* err_msg)
+*/
+
+char* create_ERR_packet(int err_code, char* err_msg)
 {
     char *buffer = malloc (5 + strlen(err_msg));
     bzero(buffer, strlen(buffer));
     unsigned short *opCodePtr = (unsigned short*) buffer; //point at empty buffer
     *opCodePtr = htons(OP_CODE_ERR); // add opcode data at empty buffer
+     opCodePtr++; //pointing to 3rd byte.
+
+    unsigned short err_code_num = (unsigned short)err_code;
+    unsigned short *err_code_ptr = opCodePtr;
+    *err_code_ptr = htons(err_code_num); // add error code to buffer
     
-    char* file_string = buffer + OPCODE_OFFSET; // point at 3rd byte
-    strcat(file_string, err_code);
+    char* file_string = buffer + DATA_OFFSET; // point at 5th byte
+    //strcat(file_string, err_code);
 	strcat(file_string, err_msg);
     return buffer;
 }
+
 
 // helper functions at reciever side
 // function to get opcode from recieved packet
@@ -144,7 +152,8 @@ unsigned short get_opcode(char* packet)
     unsigned short opCodeRcv = ntohs(*opCodePtrRcv);
     return opCodeRcv; // return opcode value
 }
-*/
+
+
 char* get_file_data(char* data_packet) 
 {
     char* buffer = data_packet;
@@ -165,17 +174,20 @@ unsigned short get_block_number(char* packet)
     return block_num; // return block number
 }
 
-//get file_name from RRQ/WRQ packet
-
-// implement
 // get error code 
-// get error mesg
-char* open_file(char* file_name)
+unsigned short get_error_code(char* packet)
 {
-    
+    unsigned short *err_num_ptr = (unsigned short*) packet + 1; 
+    unsigned short err_code = ntohs(*err_num_ptr);
+    return err_code; // return block number
 }
 
 
+// get error mesg - or may not be neccessary
+
+
+
+//get file_name from RRQ/WRQ packet
 
 
 
@@ -186,6 +198,27 @@ int main()
 
 
 
+
+
+
+char file2[]= "post.txt";
+char file1[] = "Hello world! NIce 112 to see";
+int err_code = 6;
+
+
+printf( "\n%s\n", "err packet");
+char *buf4 = create_ERR_packet(err_code, file2);
+for ( int i = 0; i < 13; i++ ) {
+        printf("0x%X,", buf4[i]);
+    } 
+
+int error_code = get_error_code(buf4);
+printf("\n error code is: %d\n", err_code);
+
+
+
+
+/*
 
 // get input file, parse it
     const size_t MAX_LEN = 100;
@@ -244,7 +277,7 @@ printf("\nThe file is: \n %s\n", gFile);
 
 
 
-/*
+
 
 
 char file2[]= "post.txt";
