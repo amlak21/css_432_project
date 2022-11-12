@@ -15,7 +15,8 @@ int main(int argc, char* argv[])
 	char buffer[MAX_BUFFER_SIZE]; // store recived packet
 	//char file_buffer[MAX_FILE_SIZE]; // store all received data file to be written on a file
 
-	
+	int port_number = SERV_UDP_PORT;
+
 	int request_bytes; // store RRQ/WRQ packet bytes
 	int packet_bytes; // store sent/receive ack, data packet bytes
 	//char recv_buffer[MAX_BUFFER_SIZE]; // store recieved ack, data packet
@@ -32,11 +33,23 @@ int main(int argc, char* argv[])
 	int cli_addr_len = sizeof(struct sockaddr);
 
 	// program name and server side input file
-	 if(argc != 2) // check number of arguments
+	 if((argc == 2)|| (argc == 4)) // check number of arguments
     {
-        fprintf(stderr,"Server erorr: Invalid number of argumnets\n");
-        exit(1);
-    }
+		if (argc == 4)
+		{
+	 		if(strcmp(argv[2], "-P") == 0 || strcmp(argv[2], "-p") == 0)
+		 	{
+				port_number =  atoi(argv[3]);
+		 	}
+
+		}
+	}
+	else
+	{
+		fprintf(stderr,"Server erorr: Invalid number of argumnets are provided\n");
+		exit(1);
+	}
+
 	prog_name = argv[0];
 	//char* serv_input_file = argv[1]; // only used when RRQ
 	//create server socket
@@ -45,7 +58,6 @@ int main(int argc, char* argv[])
 		printf("%s: can't open datagram socket\n",prog_name);
 		exit(1); 
 	}
-
 	// clear up server address
 	bzero((char *) &serv_addr, sizeof(serv_addr));
 	
@@ -53,7 +65,7 @@ int main(int argc, char* argv[])
 
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	serv_addr.sin_port        = htons(SERV_UDP_PORT); // set port
+	serv_addr.sin_port        = htons(port_number); // set port
 
 	// bind server address to the created socket
 	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
@@ -143,7 +155,6 @@ int main(int argc, char* argv[])
 
 		}
 			
-
     	else 
 		{
         	while ( EOF != (c = fgetc( fp )) && ++i < MAX_FILE_LEN )
