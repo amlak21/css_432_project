@@ -16,6 +16,8 @@ int main(int argc, char* argv[])
 
     unsigned short  opcode; // store opcode
     unsigned short block_number; // store block number - data and ack packet
+    unsigned short error_code;	//store error code
+    char error_msg[]= ""; //store error message
  
     // setting up server and client addresses                                                    
     struct sockaddr_in  cli_addr, serv_addr, *addr_ptr;
@@ -80,7 +82,7 @@ int main(int argc, char* argv[])
         bzero(buffer,sizeof(buffer));
         memcpy(buffer,RRQ_packet, sizeof(buffer));
         
-        //deallocate RRQ packet
+        free(RRQ_packet); //deallocate RRQ packet
 
 
         //send out RRQ - once
@@ -122,14 +124,16 @@ int main(int argc, char* argv[])
 
                 if(strlen(data_file) < 512) // reciving last data file
                 {
+                    free(data_file);
                     break;
                 }
-                
+                free(data_file);
+
                 char* ACK_packet = create_ACK_packet(block_number); // creat ack packet
                 bzero(buffer,sizeof(buffer));
                 memcpy(buffer,ACK_packet, sizeof(buffer));
 
-                 // deallocate ACK_packet
+                free(ACK_packet); // deallocate ACK_packet
 
                 if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
                 {
@@ -141,13 +145,24 @@ int main(int argc, char* argv[])
             }
 
 
-            //else if(opcode == 5) // error packet
-            //{
-            // get error msg
-            // get error code
-            //printf("packet contains an error packet: error code: %s, error msg: %s\n", error code,error msg) );
-            //what to do when recieving error packet
-            //}
+            else if(opcode == 5) // error packet
+            {
+                error_code = get_error_code(buffer); // get error msg
+                //error_msg = get_error_msg(buffer);// get error code - may not be necessary
+                if(error_code == 1)
+                {
+                    printf("    packet contains error packet with error code: %d: File Does Not Exist\n", error_code);
+                    exit(1);
+                }
+                else if(error_code == 2)
+                {
+                    printf("    packet contains error packet with error code: %d: No Read Permission\n", error_code);
+                    exit(1);
+                }
+                printf("    packet contains error packet with error code: %d\n", error_code);
+                exit(1);
+                //what to do when recieving error packet
+            }
 
         }
         // after break from the loop
@@ -158,7 +173,7 @@ int main(int argc, char* argv[])
         bzero(buffer,sizeof(buffer));
         memcpy(buffer,ACK_packet, sizeof(buffer));
 
-        // deallocate ACK_packet
+        free(ACK_packet); // deallocate ACK_packet
 
         if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
         {
@@ -171,18 +186,46 @@ int main(int argc, char* argv[])
             
         
     }
+
     //if WRQ
     else if(strcmp(argv[1], "-W") == 0 || strcmp(argv[1], "-w") == 0)
     {
-         char* file_name = input_file;
-        // create WRQ packet
-        char* WRQ_packet = create_WRQ_packet(file_name); //create RRQ packet
+        char* file_name = input_file;
+
+        // check if the file exist and copy to array
+        //const size_t MAX_LEN = 1600; 
+    	FILE * fp;
+    	char f_array[ MAX_FILE_LEN +1];
+    	int c;
+    	size_t i = -1; //
+    	f_array[ MAX_FILE_LEN +1] = 0;
+    	fp = fopen(argv[3],"r");   // argv[3] - input file
+
+    	if ( NULL == fp ) // check if file exists
+		{
+            printf("%s: ERROR: File does not exist\n",prog_name);
+			exit(1);
+		}
+
+    	else 
+		{
+        	while ( EOF != (c = fgetc( fp )) && ++i < MAX_FILE_LEN )
+            	f_array[ i ] = c;
+
+        	fclose (fp);
+    	}
+    	f_array[ i ] = 0;
+
+
         
-        //send out WRQ - once
+        // create WRQ packet
+       printf("\n \n"); // used for issue with malloc assertion
+
+        char* WRQ_packet = create_WRQ_packet(file_name); //create RRQ packet
         bzero(buffer,sizeof(buffer));
         memcpy(buffer,WRQ_packet, sizeof(buffer));
 
-        //deallocate WRQ packet
+        free(WRQ_packet);//deallocate WRQ packet
 
         if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
         {
@@ -198,7 +241,6 @@ int main(int argc, char* argv[])
             printf("%s: ack recvfrom error\n",prog_name);
 			exit(4);
         }
-       // printf("%s: recived %d bytes from %s\n", prog_name, packet_bytes, serv_host_addr);
 
         printf("%s: recived packet\n", prog_name);
         opcode = get_opcode(buffer);
@@ -209,27 +251,7 @@ int main(int argc, char* argv[])
             printf("    packet contains ack block: %d\n", block_number);
 
             // starts writing once it get ack
-            //const size_t MAX_LEN = 1600; 
-    	    FILE * fp;
-    	    char f_array[ MAX_FILE_LEN +1];
-    	    int c;
-    	    size_t i = -1; //
-    	    f_array[ MAX_FILE_LEN +1] = 0;
-    	    fp = fopen(argv[3],"r");   // argv[3] - input file
-
-    	    if ( NULL == fp )
-		    {
-        	    perror("Error opening file");
-		    }
-
-    	    else 
-		    {
-        	    while ( EOF != (c = fgetc( fp )) && ++i < MAX_FILE_LEN )
-            	    f_array[ i ] = c;
-
-        	    fclose (fp);
-    	    }
-    	    f_array[ i ] = 0;
+           
 
             int block_counter = 1; //block counter
             char* large_file = f_array;
@@ -245,7 +267,7 @@ int main(int argc, char* argv[])
                 bzero(buffer,sizeof(buffer));
                 memcpy(buffer,data_packet, sizeof(buffer));
 
-                //deallocate data packet
+                free(data_packet);//deallocate data packet
 
                 if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
                 {
@@ -254,7 +276,8 @@ int main(int argc, char* argv[])
                 }
             
                 printf("%s: sent data block: %d with %d bytes to %s\n", prog_name,block_counter, strlen(one_data),serv_host_addr);
-                
+                free(one_data);
+
                 // rceive ack
                 bzero(buffer,sizeof(buffer));
                 if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
@@ -265,7 +288,7 @@ int main(int argc, char* argv[])
                 printf("%s: recived packet\n", prog_name);
                 printf("    packet contains ack block: %d\n", block_counter);
                 block_counter++;
-                char* increment = large_file + 512;
+                char* increment = large_file + 512; //increment by 512 size
                 large_file = increment;
                 //n++;
             }
@@ -276,7 +299,7 @@ int main(int argc, char* argv[])
             bzero(buffer,sizeof(buffer));
             memcpy(buffer,data_packet, sizeof(buffer));
 
-            //deallocate data packet
+            free(data_packet);//deallocate data packet
 
             if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
             {
@@ -284,6 +307,8 @@ int main(int argc, char* argv[])
 			    exit(1);
             }
             printf("%s: sent last data block: %d with %d bytes to %s\n", prog_name,block_counter, strlen(one_data),serv_host_addr);
+            free(one_data);
+
             bzero(buffer,sizeof(buffer));
 
             //receive last ack
@@ -298,13 +323,28 @@ int main(int argc, char* argv[])
             
         }
 
-        //else if //error packet
+        else if(opcode == 5) //error packet
+        {
+            error_code = get_error_code(buffer); // get error code
+            if(error_code == 6) // if error code is 6
+            {
+                printf("    packet contains error packet with error code: %d: File Already Exists\n", error_code);
+               // printf("Do you want to overwrite? Y/N: ");
+                //get user response
+                //if(strcmp == y) ....etc
+                    //send response
+                exit(1);
+            }
+                    //ask for overwrite
+        }
+            
+
         else // send request again after sometime ?
         {
             printf("no ack from server");
         }
 
-        //deallocate WRQ packet
+       
           
     }
 
