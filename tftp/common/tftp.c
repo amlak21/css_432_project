@@ -1,3 +1,7 @@
+
+//this file is used for testing methods before adding 
+// to client and server codes
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -270,14 +274,6 @@ printf("\nThe file is: \n %s\n", gFile);
 
 
     
-    
-
-   
-
-
-
-
-
 
 
 char file2[]= "post.txt";
@@ -369,6 +365,7 @@ for ( int i = 0; i < 15; i++ ) {
     } 
     
 */
+
 return 0;
 }
 

@@ -11,7 +11,6 @@
 
 
 #define SERV_UDP_PORT 51091 //PORT NUMBER 
-#define MAX_NUM_PACKETS 15  // maximum number of packets
 //#define MAX_FILE_SIZE 12000000 //12 MB 
 
 
@@ -26,6 +25,7 @@ const static unsigned short OP_CODE_RRQ = 1;
 const static int OPCODE_OFFSET = 2; //
 const static char MODE[] = "octet";
 const static unsigned short OP_CODE_WRQ = 2;
+const static int FILE_NAME_BYTES = 50; //file name up to 50 bytes of length
 
 // costants for ACK packet
 const static unsigned short OP_CODE_ACK = 4;
@@ -34,6 +34,11 @@ const static unsigned short OP_CODE_ACK = 4;
 const static unsigned short OP_CODE_ERR = 5;
 
 
+
+
+// functions
+
+//to create acknowledge packet
 char* create_ACK_packet(int block)
 {
     char *buffer = malloc(4);
@@ -47,7 +52,7 @@ char* create_ACK_packet(int block)
     return buffer;
 }
 
-
+//to create write request packet
 char* create_WRQ_packet(char* input_file)
 {
     char *buffer = malloc (4 + strlen(input_file)+ strlen(MODE));
@@ -64,7 +69,7 @@ char* create_WRQ_packet(char* input_file)
     return buffer;
 }
 
-
+//to create read request packet
 char* create_RRQ_packet(char* input_file)
 {
     char *buffer = malloc(9 + strlen(input_file));
@@ -81,7 +86,7 @@ char* create_RRQ_packet(char* input_file)
     return buffer; 
 }
 
-// create packet from one data blcok size file
+// to create data packet
 // input is one data block size file <=512 bytes
 char* create_data_packet(int block, char* one_data_file)
 {
@@ -99,13 +104,12 @@ char* create_data_packet(int block, char* one_data_file)
     char *file_data = buffer + DATA_OFFSET; //point to the 5th offset
     char *file = one_data_file;
     
-    memcpy(file_data, file, strlen(file)); // bcopy , memcpy
+    memcpy(file_data, file, strlen(file)); 
     return buffer;
 }
 
-// for data file
-    //store the input file in some buffer
-    // read the next 512 byte(untill last ) and return one data packet size file <= 512
+// to get only up to 512 bytes of data from the large file
+// helper function to create a data packet
 char* get_one_packet_data(char* input_file) // tested
 {
     char* file = input_file;
@@ -125,8 +129,8 @@ char* get_one_packet_data(char* input_file) // tested
 
 }
 
-
-
+// to create error packet
+//to be used by server when need to send error packet
 char* create_ERR_packet(int err_code, char* err_msg)
 {
     char *buffer = malloc (5 + strlen(err_msg));
@@ -146,7 +150,8 @@ char* create_ERR_packet(int err_code, char* err_msg)
 }
 
 // helper functions at reciever side
-// function to get opcode from recieved packet
+// to get the opcode from the recived packet
+//help to determine what type of packet is being received
 unsigned short get_opcode(char* packet)
 {
     unsigned short *opCodePtrRcv = (unsigned short*) packet;
@@ -154,6 +159,7 @@ unsigned short get_opcode(char* packet)
     return opCodeRcv; // return opcode value
 }
 
+//to get only the actual file data from the recived data packet
 char* get_file_data(char* data_packet) 
 {
     char* buffer = data_packet;
@@ -166,7 +172,7 @@ char* get_file_data(char* data_packet)
  
 }
 
-// for data and acknoledegment packet
+// to get block number from ACK and Data packet
 unsigned short get_block_number(char* packet)
 {
     unsigned short *block_num_ptr = (unsigned short*) packet + 1; 
@@ -174,8 +180,8 @@ unsigned short get_block_number(char* packet)
     return block_num; // return block number
 }
 
-// get error code 
-
+//to get error code from recived error packet
+// help to determine what type of error is
 unsigned short get_error_code(char* packet)
 {
     unsigned short *err_num_ptr = (unsigned short*) packet + 1; 
@@ -183,4 +189,14 @@ unsigned short get_error_code(char* packet)
     return err_code; // return block number
 }
 
-// get error mesg
+//to get the file name from the recived RRQ or WRQ packet
+// to be used by server
+char* get_file_name( char* rq_packet)
+{
+    char *buffer = malloc(FILE_NAME_BYTES);
+    bzero(buffer, FILE_NAME_BYTES);
+    char *file_name_ptr = rq_packet+ OPCODE_OFFSET; //point to third offeset
+    int file_size = strlen(file_name_ptr) - 6; // subtract mmode and 1 0's bytes
+    memcpy (buffer, file_name_ptr, file_size); 
+    return buffer;
+}
