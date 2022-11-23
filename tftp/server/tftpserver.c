@@ -3,8 +3,6 @@
 #include "tftp.h"
 
 char *prog_name;
-//#define MAXMESG 2048
-//#define REQUEST_BUFFER_SIZE 50
 #define MAX_BUFFER_SIZE 516
 const size_t MAX_FILE_LEN = 60000 ; // need to be up to 12 MB file to read/write ?????????????????
 
@@ -14,12 +12,10 @@ int main(int argc, char* argv[])
 	int  sockfd;
 	char buffer[MAX_BUFFER_SIZE]; // store recived packet
 	//char file_buffer[MAX_FILE_SIZE]; // store all received data file to be written on a file
-
-	int port_number = SERV_UDP_PORT;
+	int port_number = SERV_UDP_PORT; //default port number
 
 	int request_bytes; // store RRQ/WRQ packet bytes
 	int packet_bytes; // store sent/receive ack, data packet bytes
-	//char recv_buffer[MAX_BUFFER_SIZE]; // store recieved ack, data packet
 
 	unsigned short opcode; // store opcode
     unsigned short block_number; // store block number - data and ack packet
@@ -32,26 +28,26 @@ int main(int argc, char* argv[])
 	struct sockaddr pcli_addr; //ptr to client address 
 	int cli_addr_len = sizeof(struct sockaddr);
 
-	// program name and server side input file
-	 if((argc == 2)|| (argc == 4)) // check number of arguments
+	// program name and optional -p port_number
+	 if((argc == 1)|| (argc == 3)) // check number of arguments
     {
-		if (argc == 4)
+		if (argc == 3) // if -p port_number is given
 		{
-	 		if(strcmp(argv[2], "-P") == 0 || strcmp(argv[2], "-p") == 0)
+	 		if(strcmp(argv[1], "-P") == 0 || strcmp(argv[1], "-p") == 0)
 		 	{
-				port_number =  atoi(argv[3]);
+				port_number =  atoi(argv[2]); //port number from the command line
 		 	}
-
 		}
 	}
 	else
 	{
-		fprintf(stderr,"Server erorr: Invalid number of argumnets are provided\n");
+		fprintf(stderr,"Server erorr: Invalid number of argumnets\n");
 		exit(1);
 	}
 
-	prog_name = argv[0];
-	//char* serv_input_file = argv[1]; // only used when RRQ
+	prog_name = argv[0]; //store program name for later use
+	
+
 	//create server socket
 	if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 	{
@@ -80,7 +76,7 @@ int main(int argc, char* argv[])
 	{
 
 	//recive request packet from client
-	// save client address for future sendto
+	// and save client address for future sendto
 	bzero(buffer, sizeof(buffer));
 	if(request_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, &cli_addr_len) < 0)
 	{
@@ -89,51 +85,42 @@ int main(int argc, char* argv[])
 	}
 
 	printf("%s: receievd a request \n",prog_name);
-	//use opcode to determine RRQ ot WRQ
-	
-	//char* request_ptr = buffer;
-	opcode = get_opcode(buffer);
 
-	
+	opcode = get_opcode(buffer); //get opcode to determine the request
+
 	if(opcode == 1) //RRQ
 	{
 		printf("%s: receievd RRQ \n",prog_name);
+
+		char* packet_ptr = buffer;
+    	char* file_name = get_file_name(packet_ptr); //get file name from received request packet
 		
-		// check if file exist,or permission to access to access
+		
 		//const size_t MAX_LEN = 700; 
     	FILE * fp;
-    	char f_array[ MAX_FILE_LEN +1];
+    	char f_array[ MAX_FILE_LEN +1]; //array to store the file
     	int c;
     	size_t i = -1;
     	f_array[ MAX_FILE_LEN +1] = 0;
-
-    	//char file_name[] = "hi.txt";
-    	//char*f = file_name;
-
-    	fp = fopen(argv[1],"r");
-
-    	if ( access(argv[1], F_OK) == -1) // check if file exists      //NULL == fp
+		
+		// check if file exist,or permission to access to access
+    	if ( access(file_name, F_OK) == -1) // check if file exists      
 		{
-        	
 			printf("%s: Erorr: File Does Not Exist\n",prog_name);
 			error_code = 1 ; // set error code to 1
 			strcat(error_msg, "File Does Not Exist"); // set error message
-
 		}
 
 		// check for file read access permission
-		else if(access(argv[1], R_OK) == -1)
+		else if(access(file_name, R_OK) == -1)
 		{
 			printf("%s: ERROR: No permission to access a file\n",prog_name);
 			error_code = 2; // set error code to 2
-			strcat(error_msg, "No Read Permission"); // set error message
-			
+			strcat(error_msg, "No Read Permission"); // set error message	
 		}
 
-
-
 		// send error packet if doesnt exist or no permission to read
-		if((access(argv[1], F_OK) == -1 ) || (access(argv[1], R_OK) == -1))
+		if((access(file_name, F_OK) == -1 ) || (access(file_name, R_OK) == -1))
 		{
 			// create error packet
 			char* error_packet = create_ERR_packet(error_code, error_msg);
@@ -152,17 +139,21 @@ int main(int argc, char* argv[])
           
             printf("%s: sent error packet with error code: %d\n", prog_name, error_code);
 			opcode = 5; 
-
 		}
 			
     	else 
 		{
+			fp = fopen(file_name,"r");
+
         	while ( EOF != (c = fgetc( fp )) && ++i < MAX_FILE_LEN )
             	f_array[ i ] = c;
 
         	fclose (fp);
     	}
     	f_array[ i ] = 0;
+
+		//deallocate file name
+		free(file_name);
 
         int block_counter = 1; //block counter
 		char* serv_large_file = f_array;
@@ -203,8 +194,8 @@ int main(int argc, char* argv[])
            // n++;
 			char* increment = serv_large_file + 512; // increment by 512 bytes
 			serv_large_file = increment;
-
 		}
+		
 
 		if(opcode != 5) //if error packt was sent do nothing
 		{
@@ -232,18 +223,20 @@ int main(int argc, char* argv[])
         	}
 			printf("%s: recived packet\n", prog_name);
         	printf("    packet contains last ack block: %d\n", block_counter);
-
-
 		}
-
-
 	}
 
-	else if(opcode == 2) // WRQ
+
+
+	else if(opcode == 2) // if it is WRQ
 	{
 		printf("%s: receievd WRQ\n",prog_name);
+
+		char* packet_ptr = buffer;
+    	char* file_name = get_file_name(packet_ptr); //get file name from received request packet
+
 		
-		if ( access(argv[1], F_OK) == 0) //if file already exists
+		if ( access(file_name, F_OK) == 0) //if file already exists
 		{
 			printf("%s: ERROR: File Already Exists\n",prog_name);
 			error_code = 6; // set error code to 6
@@ -265,11 +258,14 @@ int main(int argc, char* argv[])
             }
           
             printf("%s: sent error packet with error code: %d\n", prog_name, error_code);
-			opcode = 5;
+			opcode = 5; //set opcode back to error opcode
 		} 
 
+		//deallocate file_name
+		free(file_name);
+
 			
-		if(opcode != 5)
+		if(opcode != 5) //if error packet was not sent
 		{
 			//create ack packet
 			char* ACK_packet = create_ACK_packet(0);
@@ -334,10 +330,9 @@ int main(int argc, char* argv[])
 						exit(1);
         			}
 					printf("%s: sent ack block: %d \n", prog_name,block_number);
-				
 				}
-
 			}
+
 			// break from loop
 			printf("%s: has already recived last data block \n",prog_name);
 			char* ACK_packet_1 = create_ACK_packet(block_number);
@@ -351,16 +346,18 @@ int main(int argc, char* argv[])
 				exit(1);
         	}
 			printf("%s: sent last ack block: %d \n", prog_name,block_number);
-		}
-
-		
-		
+		}		
 	}
-	else // Wrong reqest
+
+
+
+	else // unkown request if it is not RRQ or WRQ
 	{
-		printf("%s: Not RRQ/WRQ request\n",prog_name);
+		printf("%s: Not RRQ or WRQ request\n",prog_name);
 		exit(2);
 	}
 	
 	}
+	
+	return 0;
 }
