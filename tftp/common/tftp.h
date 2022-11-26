@@ -200,3 +200,35 @@ char* get_file_name( char* rq_packet)
     memcpy (buffer, file_name_ptr, file_size); 
     return buffer;
 }
+
+void handle_timeout( int signum )
+{
+        printf("timeout!\n");
+        printf("retransmiting again\n");
+}
+
+// This function handles the timeout by incrementing
+// the corresponding global variables.
+//Input:  signal number.
+// Return: None.
+ 
+int register_handler( ){
+    int rt_value = 0;
+
+    //register the handler function. 
+    rt_value = ( int ) signal( SIGALRM, handle_timeout );
+    if( rt_value == ( int ) SIG_ERR ){
+        printf("can't register function handle_timeout.\n" );
+        printf("signal() error: %s.\n", strerror(errno) );
+        return -1;
+    }
+    
+    //disable the restart of system call on signal
+    //so that the OS will not stuck in the system call
+    rt_value = siginterrupt( SIGALRM, 1 );
+    if( rt_value == -1 ){
+        printf( "invalid sig number.\n" );
+        return -1;
+    }
+    return 0;
+}
