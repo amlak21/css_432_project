@@ -25,6 +25,11 @@ int main(int argc, char* argv[])
 	unsigned short error_code;	//store error code
 	char error_msg[]= ""; // store error message
 
+	char file_buffer[MAX_FILE_LEN + 1]; // store all received data file to be written on a file
+    bzero(file_buffer, sizeof(file_buffer));
+    char* file_buffer_ptr = file_buffer;
+
+
 
 	struct sockaddr_in serv_addr;
 
@@ -347,7 +352,7 @@ int main(int argc, char* argv[])
 		} 
 
 		//deallocate file_name
-		free(file_name);
+		//free(file_name);
 
 			
 		if(opcode != 5) //if error packet was not sent
@@ -389,7 +394,7 @@ int main(int argc, char* argv[])
 					char* buffer_rcvd = buffer;
 					char* data_file = get_file_data(buffer_rcvd);
 
-					 //diecard duplicates
+					 //discard duplicates
                 	if(next_block_nuber > block_number)
                 	{
                     	printf("    packet contains data block: %d with %li bytes: duplicate and discarded\n", block_number,strlen(data_file) );
@@ -399,11 +404,14 @@ int main(int argc, char* argv[])
                 	else if(next_block_nuber == block_number)
                 	{
                     	printf("    packet contains data block: %d with %li bytes\n", block_number,strlen(data_file) );
-                    	// open the file
-                    	// check if not empty
-                    	//write to file when not empty
-                    	// parse data block
-                    	// copy the file - copy it at large buffer and then write that buffer to file
+                    	
+
+						//collect the recived file to file_buffer
+						char* data_file_ptr = data_file;
+                    	memcpy(file_buffer_ptr, data_file_ptr, strlen(data_file_ptr));
+                    	char* file_increment = file_buffer_ptr + 512; //increment to the 513 address
+                    	file_buffer_ptr = file_increment;
+						
                     	next_block_nuber++; //increment next expected block
                 	}
 
@@ -420,14 +428,17 @@ int main(int argc, char* argv[])
 					}
 					free(data_file);
 
-					//to test timeout
-					// suspend server after it recievd data block 10
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+					//needed only to test timeout
+					// suspend server after it recievd data block 5
 					if(block_number == 5)
                 	{
                     	printf("%s: sleep for 5 seconds \n", prog_name);
 						sleep(5); // sleep for five seconds
 						
                 	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 					//create ack packet
 					char* ACK_packet_1 = create_ACK_packet(block_number);
@@ -457,7 +468,20 @@ int main(int argc, char* argv[])
 				exit(1);
         	}
 			printf("%s: sent last ack block: %d \n", prog_name,block_number);
-		}		
+		}
+
+
+		// write file to directory 
+        FILE *fp; 
+        fp = fopen(file_name, "w" ); //open file in write mode
+									//file_name recived from the request packet
+        fwrite(file_buffer , 1 , strlen(file_buffer) , fp ); // write file
+
+        fclose(fp); // close file
+
+		//deallocate file_name
+		free(file_name);
+
 	}
 
 
