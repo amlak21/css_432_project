@@ -12,12 +12,17 @@ int main(int argc, char* argv[])
     int sockfd;
     int packet_bytes; // store sent/receive packet bytes
     char buffer[MAX_BUFFER_SIZE];  // store recived data packet
-    //char file_buffer[MAX_FILE_SIZE]; // store all received data file to be written on a file
+
+    char file_buffer[MAX_FILE_LEN + 1]; // store all received data file to be written on a file
+    bzero(file_buffer, sizeof(file_buffer));
+    char* file_buffer_ptr = file_buffer;
+
+
     int port_number = SERV_UDP_PORT; //default port number
 
     unsigned short  opcode; // store opcode
     unsigned short block_number; // store block number - data and ack packet
-    unsigned short next_block_nuber; // store next expected block number
+    unsigned short next_block_number; // store next expected block number
     int timeout_counter; // to store number of timeouts
     unsigned short error_code;	//store error code
    // char error_msg[]= ""; //store error message
@@ -83,7 +88,8 @@ int main(int argc, char* argv[])
 	}
     // ready to send request to server
     // if RRQ
-    if(strcmp(argv[1], "-R") == 0 || strcmp(argv[1], "-r") == 0){ 
+    if(strcmp(argv[1], "-R") == 0 || strcmp(argv[1], "-r") == 0)
+    { 
         char* file_name = input_file;
         char* RRQ_packet = create_RRQ_packet(file_name); //create RRQ packet
 
@@ -92,7 +98,7 @@ int main(int argc, char* argv[])
         
         free(RRQ_packet); //deallocate RRQ packet
 
-        //send out RRQ - once
+        //send out RRQ 
         if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1)
         {
             printf("%s: RRQ send to error on socket\n",prog_name);
@@ -101,18 +107,18 @@ int main(int argc, char* argv[])
 
         printf("%s: sent RRQ to %s\n", prog_name, serv_host_addr);
 
-        next_block_nuber = 1; //expected block number
-          
+        next_block_number = 1; //expected block number
+        
         while(1) //infinite while loop to receive data and send ack unilt last data
         {           //will break when last data block is received
             bzero(buffer,sizeof(buffer));
+
             if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
             {
                 printf("%s: data block recvfrom error\n",prog_name);
-			    exit(4);
+			    exit(4);			
             }
 
-            //printf("%s: recived packet \n",prog_name);
             opcode = get_opcode(buffer);
             block_number = get_block_number(buffer);
             
@@ -122,22 +128,25 @@ int main(int argc, char* argv[])
                 char* buffer_rcvd = buffer;
                 char* data_file = get_file_data(buffer_rcvd); //get the actual data from packet
                 
-                //diecard duplicates
-                if(next_block_nuber > block_number)
+                //discard duplicates
+                if(next_block_number > block_number)
                 {
                     printf("    packet contains data block: %d with %li bytes: duplicate and discarded\n", block_number,strlen(data_file) );
                 }
 
 
-                else if(next_block_nuber == block_number)
+                else if(next_block_number == block_number)
                 {
                     printf("    packet contains data block: %d with %li bytes\n", block_number,strlen(data_file) );
-                    // open the file
-                    // check if not empty
-                    //write to file when not empty
-                    // parse data block
-                    // copy the file - copy it at large buffer and then write that buffer to file
-                    next_block_nuber++; //increment next expected block
+
+
+                    //store the recived file
+                    char* data_file_ptr = data_file;
+                    memcpy(file_buffer_ptr, data_file_ptr, strlen(data_file_ptr));
+                    char* file_increment = file_buffer_ptr + 512; //point at the 513th index
+                    file_buffer_ptr = file_increment;
+
+                    next_block_number++; //increment next expected block
                 }
 
                 else //discard unorderd block
@@ -154,14 +163,18 @@ int main(int argc, char* argv[])
                 }
                 free(data_file);
 
-                // to test timeout
-                // to suspend it after reciving data block 10
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+                // needed only to test timeout
+                // to suspend it after reciving data block 5
                 if(block_number == 5)
                 {
                     printf("%s: sleep for 5 seconds \n",prog_name);
                     sleep(5); // sleep for five seconds
-        
                 }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
                 char* ACK_packet = create_ACK_packet(block_number); // creat ack packet
                 bzero(buffer,sizeof(buffer));
@@ -176,7 +189,6 @@ int main(int argc, char* argv[])
                 }
                 printf("%s: sent ACK block: %d to %s\n", prog_name, block_number, serv_host_addr);
             }
-
 
             else if(opcode == 5) // received error packet
             {
@@ -198,6 +210,7 @@ int main(int argc, char* argv[])
             }
 
         }
+
         // after break from the loop on last data block
         printf("%s: has already recived last data block \n",prog_name);
 
@@ -213,7 +226,17 @@ int main(int argc, char* argv[])
             printf("%s: ack sendto error on socket\n",prog_name);
 			exit(1);
         }
-        printf("%s: sent last ACK block: %d to %s\n", prog_name, block_number, serv_host_addr);    
+        printf("%s: sent last ACK block: %d to %s\n", prog_name, block_number, serv_host_addr);  
+
+
+        // write file to directory 
+        FILE *fp; 
+        fp = fopen(argv[2], "w" ); //open file in write mode
+        fwrite(file_buffer , 1 , strlen(file_buffer) , fp ); //write to file
+
+        fclose(fp); //close file
+        
+    
     }
 
 
@@ -331,7 +354,7 @@ int main(int argc, char* argv[])
                  
                 // get one data block size data (only 512 bytes)
               
-                char* one_data = get_one_packet_data(current_bytes); //???????????
+                char* one_data = get_one_packet_data(current_bytes); 
                
                 char* data_packet = create_data_packet(block_counter, one_data);
                
