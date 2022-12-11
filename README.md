@@ -9,12 +9,16 @@
             tftpclient.c
          
             makefile 
+            
+            tftp.h
          
       /server
     
             tftpserver.c
          
             makefile
+            
+            tftp.h
          
       /common
     
