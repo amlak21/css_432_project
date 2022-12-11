@@ -25,7 +25,7 @@
             tftp.h
             
  # How to compile
- Step 1: Put the directories and files in the structure as shown above.
+ Step 1: Put the directories and files in the structure as shown above. The tftp.h in client and server directory is the copy of the tftp.h in common directory.
  
  Step 2: open integrated terminal from css lab machine on tfttp directtory and run make. It will excute the makefile in the tftp, and that makefile inturn will excute both the makefile in server and in client directories. Or run make on server and client directories individually. Either way an excutable file client from tftpclient.c and server from tftpserver.c will be created. 
       
