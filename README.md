@@ -50,7 +50,7 @@ Step 2: First run ./server  on server directory. Then run ./client -r file_name 
                               The client will send the file, and the file  with same file name and its content will be found at server directory.
                               
                               
-      To give port number at command line:  same port number for client and server.
+To give port number at command line:  same port number for client and server.
       
             For read request:    user@csslab4 tftp/server%./server -p port_number    and then       user@csslab4 tftp/client%./client -r file_name -p port_number
             
