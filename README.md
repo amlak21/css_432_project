@@ -61,6 +61,8 @@ To give port number at command line:  same port number for client and server.
             
                         
                         e.g:   user@csslab4 tftp/server%./server -p 5000555    and then      user@csslab4 tftp/client%./client -w file_name -p 5000555
+                        
+ For more information, please refer the screenshots on project report.
                          
       
       
