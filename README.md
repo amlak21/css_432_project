@@ -32,7 +32,25 @@
       e.g. user@csslab4 tftp% make 
       
       or user@csslab4 tftp/server%make       and     user@csslab4 tftp/client% make
+      
+# How to run
    
-Step 3: Open two integrated terminals from one css lab machine. One on server directory and the other on client directory.
+Step 1: Open two integrated terminals from one css lab machine. One on server directory and the other on client directory.
 
       e.g user@csslab4 tftp/server%         and       user@csslab4 tftp/client%
+      
+Step 2: First run ./server  on server directory. Then run ./client -r file_name  for read request or ./client -w file_name for write request on client directory.
+
+      e.g. For read request:    user@csslab4 tftp/server%./server    and then       user@csslab4 tftp/client%./client -r file_name
+      
+            For write request:   user@csslab4 tftp/server%./server    and then      user@csslab4 tftp/client%./client -w file_name
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
