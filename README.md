@@ -1,9 +1,7 @@
 # Directory structure
-/tftp
-
-     makefile
-     
-    /client
+/tftp <br> 
+      makefile <br> 
+     /client
     
          tftpclient.c
          
