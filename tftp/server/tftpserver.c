@@ -1,10 +1,11 @@
 
+//tftpserver.c
 
 #include "tftp.h"
 
 char *prog_name;
 #define MAX_BUFFER_SIZE 516
-const  size_t MAX_FILE_LEN = 1200000; // need to be up to 12 MB file to read/write ?????????????????
+const  size_t MAX_FILE_LEN = 1200000; // up to 1.2MB
 
 
 
@@ -12,7 +13,7 @@ int main(int argc, char* argv[])
 {
 	int  sockfd;
 	char buffer[MAX_BUFFER_SIZE]; // store recived packet
-	//char file_buffer[MAX_FILE_SIZE]; // store all received data file to be written on a file
+	
 	int port_number = SERV_UDP_PORT; //default port number
 
 	int request_bytes; // store RRQ/WRQ packet bytes
@@ -43,7 +44,7 @@ int main(int argc, char* argv[])
 		{
 	 		if(strcmp(argv[1], "-P") == 0 || strcmp(argv[1], "-p") == 0)
 		 	{
-				port_number =  atoi(argv[2]); //port number from the command line
+				port_number =  atoi(argv[2]); //port number if entered from the command line
 		 	}
 		}
 	}
@@ -83,6 +84,7 @@ int main(int argc, char* argv[])
 	for(; ; )
 	{
 
+		
 	//recive request packet from client
 	// and save client address for future sendto
 	bzero(buffer, sizeof(buffer));
@@ -92,7 +94,7 @@ int main(int argc, char* argv[])
 		exit(3);
 	}
 
-	printf("%s: receievd a request \n",prog_name);
+	
 
 	opcode = get_opcode(buffer); //get opcode to determine the request
 
@@ -106,15 +108,14 @@ int main(int argc, char* argv[])
 		char* packet_ptr = buffer;
     	char* file_name = get_file_name(packet_ptr); //get file name from received request packet
 		
-		
-		//const size_t MAX_LEN = 700; 
+		 
     	FILE * fp;
-    	char f_array[ MAX_FILE_LEN +1]; //array to store the file
+    	char f_array[ MAX_FILE_LEN +1]; //array to store the file to be read
     	int c;
     	size_t i = -1;
     	f_array[ MAX_FILE_LEN +1] = 0;
 		
-		// check if file exist,or permission to access to access
+		// check if file exist in server
     	if ( access(file_name, F_OK) == -1) // check if file exists      
 		{
 			printf("%s: Erorr: File Does Not Exist\n",prog_name);
@@ -181,55 +182,56 @@ int main(int argc, char* argv[])
 			char* serv_one_data = get_one_packet_data(current_bytes); // get first 512 bytes
         	char* data_packet = create_data_packet(block_counter, serv_one_data); // create data packet
 			
-			// send data block 1
-			bzero(buffer, sizeof(buffer));
-			memcpy(buffer,data_packet, sizeof(buffer));
-
-			free(data_packet); // deallocate data packet
-
 			timeout_counter = 0;
 
 			while(1) //retransmit untill reciveing ack
 			{
+				bzero(buffer, sizeof(buffer));
+				memcpy(buffer,data_packet, sizeof(buffer));
+
+				//send data blocks
 				if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
             	{
                 	printf("%s: data block send to error on socket\n",prog_name);
+					free(data_packet); // deallocate data packet
+					free(serv_one_data);  //deallocate one the data block
 			    	exit(1);
             	}
           
             	printf("%s: sent data block: %d with %li bytes. Timer set.\n", prog_name,block_counter,strlen(serv_one_data) );
-				//free(serv_one_data); 
-
-				// recv ack #1
 			 
 				//start timer
-				//printf("setting a timeout alarm\n");
 				alarm(1);
-            	//printf("Waiting to receive data from server\n");
+            	
 
-				bzero(buffer, sizeof(buffer));
+				bzero(buffer, sizeof(buffer)); //clear buffer
 				if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
             	{
             	
 					if( errno == EINTR )
 					{
-			    		//printf("timeout triggered!\n");
+			    		
 						
 						timeout_counter++; //increment timeout counter
 						if(timeout_counter == 10) //terminate after 10 consecutive timeouts
 						{
 							printf("%s: 10 timeouts reached and terminated\n",prog_name);
+							free(data_packet); // deallocate data packet
+							free(serv_one_data);  //deallocate one the data block
 							exit(4);
 							
 						}
 							
-						//retransmit on timeout
+						//retransmit same block data on timeout
+						alarm(0);
 						continue;
 					}
 
 					else //terminate on other recvfrom error
 					{
 						printf("%s: ack recvfrom error\n",prog_name);
+						free(data_packet); // deallocate data packet
+						free(serv_one_data);  //deallocate one the data block
 						exit(4);
 					}
 			 	} 
@@ -239,11 +241,15 @@ int main(int argc, char* argv[])
 			       break;
 			 	}
             }
-			free(serv_one_data); 
+
+			free(serv_one_data);  //deallocate one the data block
+			free(data_packet); // deallocate data packet
+
 			printf("%s: recived packet. Timer cleared!\n", prog_name);
-			alarm(0);
+			alarm(0); // clear timer
 			timeout_counter = 0; //reset timeout counter
             printf("    packet contains ack block: %d\n", block_counter);
+
 			block_counter++; //increment block number
 			char* increment = serv_large_file + 512; // increment by 512 bytes
 			serv_large_file = increment;
@@ -255,26 +261,29 @@ int main(int argc, char* argv[])
 		{
 			char* serv_one_data = get_one_packet_data(serv_large_file); // get first 512 bytes
 			char* data_packet = create_data_packet(block_counter, serv_one_data); //create data packet
-			bzero(buffer, sizeof(buffer));
-			memcpy(buffer,data_packet, sizeof(buffer)); //copy data packet to buffer
-			free(data_packet); // deallocate data packet
+			
 
 			timeout_counter = 0;
 			while(1) //retransmit until receiving ack
 			{
+				bzero(buffer, sizeof(buffer));
+				memcpy(buffer,data_packet, sizeof(buffer)); //copy data packet to buffer
+
 				if((packet_bytes = sendto(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, cli_addr_len)) == -1)
         		{
             		printf("%s: data block send to error on socket\n",prog_name);
+
+					free(serv_one_data);
+					free(data_packet); // deallocate data packet
+
 					exit(1);
         		}
 	
         		printf("%s: sent last data block: %d with %li bytes. Timer set!\n", prog_name,block_counter,strlen(serv_one_data) );
-				free(serv_one_data);
+				
 
 				//start timer
-				//printf("setting a timeout alarm\n");
 				alarm(1);
-            	//printf("Waiting to receive data from server\n");
 
 				// recieve acknoledege
 				bzero(buffer, sizeof(buffer));
@@ -282,22 +291,30 @@ int main(int argc, char* argv[])
         		{
 					if( errno == EINTR )
 					{
-			    		//printf("timeout triggered!\n");
+			    		
 						
 						timeout_counter++; //increment timeout counter
 						if(timeout_counter == 10) //terminate after 10 consecutive timeouts
 						{
 							printf("%s: 10 timeouts reached and terminated\n",prog_name);
+							free(serv_one_data);
+							free(data_packet); // deallocate data packet
+
 							exit(4);
 						}
 							
 						//retransmit on timeout
+						alarm(0);
 						continue;
 					}
 
 					else //terminate on other recvfrom error
 					{
 						printf("%s: ack recvfrom error\n",prog_name);
+
+						free(serv_one_data);
+						free(data_packet); // deallocate data packet
+
 						exit(4);
 					}		
         		}
@@ -308,10 +325,16 @@ int main(int argc, char* argv[])
 				}
 				
 			}
+
+			free(serv_one_data);
+			free(data_packet); // deallocate data packet
+
 			printf("%s: recived packet. Timer cleared\n", prog_name);
 			alarm(0);
 			timeout_counter = 0; //reset timeout counter
         	printf("    packet contains last ack block: %d\n", block_counter);
+			printf("\nFile Sent Successfully!\n");
+			printf("RRQ done!\n");
 			
 		}
 	}
@@ -351,10 +374,7 @@ int main(int argc, char* argv[])
 			opcode = 5; //set opcode back to error opcode
 		} 
 
-		//deallocate file_name
-		//free(file_name);
-
-			
+		
 		if(opcode != 5) //if error packet was not sent
 		{
 			//create ack packet
@@ -383,8 +403,7 @@ int main(int argc, char* argv[])
 					exit(4);
         		}
 
-				//printf("%s: recived packet\n", prog_name);
-
+		
 				opcode = get_opcode(buffer);
 				block_number = get_block_number(buffer);
 
@@ -401,7 +420,7 @@ int main(int argc, char* argv[])
                 	}
 
 
-                	else if(next_block_nuber == block_number)
+                	else if(next_block_nuber == block_number) //if block number is the expected block number
                 	{
                     	printf("    packet contains data block: %d with %li bytes\n", block_number,strlen(data_file) );
                     	
@@ -409,9 +428,25 @@ int main(int argc, char* argv[])
 						//collect the recived file to file_buffer
 						char* data_file_ptr = data_file;
                     	memcpy(file_buffer_ptr, data_file_ptr, strlen(data_file_ptr));
-                    	char* file_increment = file_buffer_ptr + 512; //increment to the 513 address
+                    	char* file_increment = file_buffer_ptr + strlen(data_file_ptr); // increment to point at after data file index
                     	file_buffer_ptr = file_increment;
+
+///////////////////////////////////////////////////////////////////////////////////////////
+					/*
+						//needed only to test timeout
+						// suspend server after it recievd data block 5
+
+						if(block_number == 5)
+                		{
+							
+                    		printf("%s: sleep for 5 seconds \n", prog_name);
+							sleep(11); // sleep for five seconds
 						
+                		}
+					*/
+////////////////////////////////////////////////////////////////////////////////////////
+
+
                     	next_block_nuber++; //increment next expected block
                 	}
 
@@ -428,17 +463,6 @@ int main(int argc, char* argv[])
 					}
 					free(data_file);
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////
-					//needed only to test timeout
-					// suspend server after it recievd data block 5
-					if(block_number == 5)
-                	{
-                    	printf("%s: sleep for 5 seconds \n", prog_name);
-						sleep(5); // sleep for five seconds
-						
-                	}
-
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 					//create ack packet
 					char* ACK_packet_1 = create_ACK_packet(block_number);
@@ -455,9 +479,11 @@ int main(int argc, char* argv[])
 				}
 			}
 
-			// break from loop
+			// when break from loop
 			printf("%s: has already recived last data block \n",prog_name);
+
 			char* ACK_packet_1 = create_ACK_packet(block_number);
+
 			bzero(buffer, sizeof(buffer));
 			memcpy(buffer,ACK_packet_1, sizeof(buffer));
 			free(ACK_packet_1); // deallocate ack packet_1
@@ -468,6 +494,7 @@ int main(int argc, char* argv[])
 				exit(1);
         	}
 			printf("%s: sent last ack block: %d \n", prog_name,block_number);
+			printf("\nFile Received Successfully!\n");
 		}
 
 
@@ -481,15 +508,21 @@ int main(int argc, char* argv[])
 
 		//deallocate file_name
 		free(file_name);
+		
+		printf("WRQ done!!\n");
 
 	}
 
+	else if(opcode == 3 || opcode == 4)
+	{
 
+	}
 
 	else // unkown request if it is not RRQ or WRQ
 	{
-		printf("%s: Not RRQ or WRQ request\n",prog_name);
-		exit(2);
+		//printf("%s: Not RRQ or WRQ request\n",prog_name);
+		printf("%s: waiting to receive request\n",prog_name);
+		
 	}
 	
 	}
