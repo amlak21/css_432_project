@@ -8,9 +8,12 @@
 #include <string.h>         // for strerror function.
 #include <signal.h>         // for the signal handler registration.
 #include <unistd.h>
+#include <sys/wait.h>
 
 
-#define SERV_UDP_PORT 51091 //PORT NUMBER 
+
+#define SERV_UDP_PORT 51091222 //PORT NUMBER
+
 //#define MAX_FILE_SIZE 12000000 //12 MB 
 
 
@@ -201,6 +204,7 @@ char* get_file_name( char* rq_packet)
     return buffer;
 }
 
+
 void handle_timeout( int signum )
 {
         printf("timeout!\n");
@@ -216,8 +220,8 @@ int register_handler( ){
     int rt_value = 0;
 
     //register the handler function. 
-    rt_value = ( int ) signal( SIGALRM, handle_timeout );
-    if( rt_value == ( int ) SIG_ERR ){
+    rt_value = ( long ) signal( SIGALRM, handle_timeout );
+    if( rt_value == ( long ) SIG_ERR ){
         printf("can't register function handle_timeout.\n" );
         printf("signal() error: %s.\n", strerror(errno) );
         return -1;
