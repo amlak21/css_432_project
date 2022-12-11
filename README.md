@@ -1,19 +1,21 @@
 # Directory structure
-/tftp <br> 
-      makefile <br> 
+
+/tftp 
+      makefile
+      
       /client
     
-         tftpclient.c
+            tftpclient.c
          
-         makefile 
+            makefile 
          
-    /server
+      /server
     
-         tftpserver.c
+            tftpserver.c
          
-         makefile
+            makefile
          
-    /common
+      /common
     
-         tftp.h
+            tftp.h
    
