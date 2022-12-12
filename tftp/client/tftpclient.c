@@ -36,6 +36,8 @@ int main(int argc, char* argv[])
     // setting up server and client addresses                                                    
     struct sockaddr_in  cli_addr, serv_addr;
 
+    unsigned int serv_addr_len = sizeof(struct sockaddr_in);
+
     // argumnets order: prog_name, RQ, file,
      if((argc == 3) || (argc == 5)) // check number of arguments
     {
@@ -119,7 +121,7 @@ int main(int argc, char* argv[])
         {           //loop will break when last data block is received
             bzero(buffer,sizeof(buffer));
 
-            if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+            if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&serv_addr, &serv_addr_len)) < 0)
             {
                 printf("%s: data block recvfrom error\n",prog_name);
 			    exit(4);			
@@ -156,7 +158,7 @@ int main(int argc, char* argv[])
             /*
                 // needed only to test timeout
                 // to suspend it after reciving data block 5
-                if(block_number == 5)
+                if(block_number == 3)
                 {
                     printf("%s: sleep for 5 seconds \n",prog_name);
                     sleep(5); // sleep for five seconds
@@ -172,7 +174,6 @@ int main(int argc, char* argv[])
                     printf("    packet contains data block: %d with %li bytes: unordered and discarded\n", block_number,strlen(data_file) );
 
                 }
-
                
                 if(strlen(data_file) < 512) // reciving last data file
                 {
@@ -243,9 +244,7 @@ int main(int argc, char* argv[])
         fclose(fp); //close file
         printf("\nFile Received Successfully!\n");
         
-    
     }
-
 
 
     //if it is WRQ
@@ -285,8 +284,6 @@ int main(int argc, char* argv[])
     	}
     	f_array[ i ] = 0;
    
-      
-
         char* file_name = input_file;
 
         char* WRQ_packet = create_WRQ_packet(file_name); //create RRQ packet
@@ -309,7 +306,7 @@ int main(int argc, char* argv[])
             //recievefrom ack #0 
             alarm(1);
             bzero(buffer,sizeof(buffer));
-            if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+            if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, &serv_addr_len)) < 0)
             {
                 if( errno == EINTR )
 				{
@@ -392,7 +389,7 @@ int main(int argc, char* argv[])
                     alarm(1); //set timer
 
                     bzero(buffer,sizeof(buffer));
-                    if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+                    if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, &serv_addr_len)) < 0)
                     {
                         if( errno == EINTR )
 					    {
@@ -445,10 +442,7 @@ int main(int argc, char* argv[])
             char* one_data = get_one_packet_data(large_file);
             char* data_packet = create_data_packet(block_counter, one_data);
 
-           
-
-            
-
+        
             timeout_counter = 0;
 
             while(1) // for last data block
@@ -469,7 +463,7 @@ int main(int argc, char* argv[])
                 bzero(buffer,sizeof(buffer));
 
                 //receive last ack
-                if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL)) < 0)
+                if((packet_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *) &serv_addr, &serv_addr_len)) < 0)
                 {
                     if( errno == EINTR )
 					{
