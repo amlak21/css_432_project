@@ -11,26 +11,13 @@ const  size_t MAX_FILE_LEN = 1200000; // up to 1.2MB
 
 int main(int argc, char* argv[])
 {
-	int  sockfd;
-	char buffer[MAX_BUFFER_SIZE]; // store recived packet
-	
+	int  sockfd, old_sockfd;
+	char rq_buffer[MAX_BUFFER_SIZE]; // store recived packet
 	int port_number = SERV_UDP_PORT; //default port number
 
 	int request_bytes; // store RRQ/WRQ packet bytes
-	int packet_bytes; // store sent/receive ack, data packet bytes
-	int timeout_counter;
-
 	unsigned short opcode; // store opcode
-    unsigned short block_number; // store block number - data and ack packet
-	unsigned short next_block_nuber; // store next expected block number
-	unsigned short error_code;	//store error code
-	char error_msg[]= ""; // store error message
-
-	char file_buffer[MAX_FILE_LEN + 1]; // store all received data file to be written on a file
-    bzero(file_buffer, sizeof(file_buffer));
-    char* file_buffer_ptr = file_buffer;
-
-
+	
 
 	struct sockaddr_in serv_addr;
 
@@ -58,7 +45,7 @@ int main(int argc, char* argv[])
 	
 
 	//create server socket
-	if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+	if ( (old_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 	{
 		printf("%s: can't open datagram socket\n",prog_name);
 		exit(1); 
@@ -73,7 +60,7 @@ int main(int argc, char* argv[])
 	serv_addr.sin_port        = htons(port_number); // set port
 
 	// bind server address to the created socket
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+	if (bind(old_sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
 	{ 
 		printf("%s: can't bind local address\n",prog_name);
 		exit(2);
@@ -87,25 +74,46 @@ int main(int argc, char* argv[])
 		
 	//recive request packet from client
 	// and save client address for future sendto
-	bzero(buffer, sizeof(buffer));
-	if((request_bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, &pcli_addr, &cli_addr_len)) < 0)
+	bzero(rq_buffer, sizeof(rq_buffer));
+	if((request_bytes = recvfrom(old_sockfd, rq_buffer, sizeof(rq_buffer), 0, &pcli_addr, &cli_addr_len)) < 0)
 	{
 		printf("%s: WRQ/RRQ recvfrom error\n",prog_name);
 		exit(3);
 	}
 
-	
+	opcode = get_opcode(rq_buffer); //get opcode to determine the request
 
-	opcode = get_opcode(buffer); //get opcode to determine the request
+	pid_t pid = fork();
+    
+    if (pid == 0) 
+	{ // we are in the child process
+
+		char buffer[MAX_BUFFER_SIZE]; // store recived packet
+		unsigned short block_number; // store block number - data and ack packet
+		unsigned short next_block_nuber; // store next expected block number
+		unsigned short error_code;	//store error code
+		char error_msg[]= ""; // store error message
+
+		int packet_bytes; // store sent/receive ack, data packet bytes
+		int timeout_counter;
+
+		char file_buffer[MAX_FILE_LEN + 1]; // store all received data file to be written on a file
+    	bzero(file_buffer, sizeof(file_buffer));
+    	char* file_buffer_ptr = file_buffer;
+
+      
+		if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+		{
+			printf("%s: can't open datagram socket\n",prog_name);
+			exit(1); 
+		}
 
 
-
-
-	if(opcode == 1) //RRQ
-	{
+		if(opcode == 1) //RRQ
+		{
 		printf("%s: receievd RRQ \n",prog_name);
 
-		char* packet_ptr = buffer;
+		char* packet_ptr = rq_buffer;
     	char* file_name = get_file_name(packet_ptr); //get file name from received request packet
 		
 		 
@@ -345,7 +353,7 @@ int main(int argc, char* argv[])
 	{
 		printf("%s: receievd WRQ\n",prog_name);
 
-		char* packet_ptr = buffer;
+		char* packet_ptr = rq_buffer;
     	char* file_name = get_file_name(packet_ptr); //get file name from received request packet
 
 		
@@ -430,17 +438,16 @@ int main(int argc, char* argv[])
                     	memcpy(file_buffer_ptr, data_file_ptr, strlen(data_file_ptr));
                     	char* file_increment = file_buffer_ptr + strlen(data_file_ptr); // increment to point at after data file index
                     	file_buffer_ptr = file_increment;
-
-///////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 					/*
 						//needed only to test timeout
 						// suspend server after it recievd data block 5
 
-						if(block_number == 5)
+						if(block_number == 3)
                 		{
 							
                     		printf("%s: sleep for 5 seconds \n", prog_name);
-							sleep(11); // sleep for five seconds
+							sleep(5); // sleep for five seconds
 						
                 		}
 					*/
@@ -510,12 +517,11 @@ int main(int argc, char* argv[])
 		free(file_name);
 		
 		printf("WRQ done!!\n");
-
 	}
 
 	else if(opcode == 3 || opcode == 4)
 	{
-
+		
 	}
 
 	else // unkown request if it is not RRQ or WRQ
@@ -524,8 +530,15 @@ int main(int argc, char* argv[])
 		printf("%s: waiting to receive request\n",prog_name);
 		
 	}
+        exit (0); // terminates the child process
+}
+
+else
+{
+	waitpid(pid, NULL, 0);
+}
 	
-	}
+}
 	
 	return 0;
 }
